@@ -14,6 +14,7 @@
   const COMBO_MS=5000, MULT_CAP=8;    // streak window + cap
   const COIN_RATE=100;                // points per coin earned
   const MIN_WORD=3;
+  const MAX_BALL_FRAMES=360;          // failsafe: force-settle a ball stuck bouncing (~6s) so the launcher never locks
 
   // Restitution (bounciness) by bumper kind. >1 adds energy.
   // 'charger' uses identical physics to 'bouncer' (so reachability is unchanged);
@@ -113,6 +114,17 @@
     updateHUD(); syncMode();
   }
   function lowestEmpty(c){for(let r=ROWS-1;r>=0;r--) if(!grid[r][c]) return r; return -1;}
+  function nearestOpenCol(c){for(let d=1;d<COLS;d++){if(c-d>=0&&lowestEmpty(c-d)>=0)return c-d;if(c+d<COLS&&lowestEmpty(c+d)>=0)return c+d;}return -1;}
+  // Resolve the live ball into the grid: its aimed column, or the nearest column
+  // with room if that one is full. Only ends the game when the WHOLE board is full.
+  function settleBall(){
+    if(!ball)return;
+    let c=Math.max(0,Math.min(COLS-1,Math.floor((ball.x-GX0)/CELL)));
+    let r=lowestEmpty(c);
+    if(r<0){ c=nearestOpenCol(c); if(c<0){ endGame(); ball=null; return; } r=lowestEmpty(c); }
+    drop={c,r,letter:ball.letter,y:Math.min(ball.y,cellY(r)),vy:Math.max(ball.vy,4),bonus:ball.bonus};
+    ball=null;
+  }
 
   // ---- bumpers ----
   function updateBumpers(now){
@@ -127,12 +139,12 @@
   // ---- aim / fire ----
   function dragVec(){let dx=aim.cx-aim.sx,dy=aim.cy-aim.sy,d=Math.hypot(dx,dy);
     if(d>MAX_PULL){dx*=MAX_PULL/d;dy*=MAX_PULL/d;}return{x:dx,y:dy,d:Math.min(d,MAX_PULL)};}
-  function launch(vx,vy){ball={x:ANCHOR.x,y:ANCHOR.y,vx,vy,r:BALL_R,letter:current,rot:0,bonus:false};}
+  function launch(vx,vy){ball={x:ANCHOR.x,y:ANCHOR.y,vx,vy,r:BALL_R,letter:current,rot:0,bonus:false,age:0};}
 
   // ---- physics ----
   function step(){
     if(!ball)return;
-    ball.vy+=GRAV; ball.x+=ball.vx; ball.y+=ball.vy; ball.rot+=ball.vx*0.02;
+    ball.vy+=GRAV; ball.x+=ball.vx; ball.y+=ball.vy; ball.rot+=ball.vx*0.02; ball.age++;
     if(ball.x<ball.r){ball.x=ball.r;ball.vx*=-0.7;if(Math.abs(ball.vx)>1.2)sfx('wall');}
     if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx*=-0.7;if(Math.abs(ball.vx)>1.2)sfx('wall');}
     if(ball.y<ball.r){ball.y=ball.r;ball.vy*=-0.5;}
@@ -145,12 +157,8 @@
         ping(b.x,b.y,col, b.kind==='peg'?4:8);
         if(b.kind==='charger'&&!ball.bonus){ball.bonus=true;ping(b.x,b.y,'#ffe9a8',12);sfx('streakUp',3);}
         sfx(b.kind==='peg'?'peg':'bouncer');}}
-    if(ball.vy>0 && ball.y+ball.r>=BOARD_TOP){
-      const c=Math.max(0,Math.min(COLS-1,Math.floor((ball.x-GX0)/CELL)));
-      const r=lowestEmpty(c);
-      if(r<0){endGame();ball=null;return;}
-      drop={c,r,letter:ball.letter,y:Math.min(ball.y,cellY(r)),vy:Math.max(ball.vy,4),bonus:ball.bonus};ball=null;return;
-    }
+    if(ball.vy>0 && ball.y+ball.r>=BOARD_TOP){ settleBall(); return; }
+    if(ball.age>MAX_BALL_FRAMES){ settleBall(); return; }   // failsafe: a stuck ball can never lock the launcher
     if(ball.y>H+60){ball=null;}
   }
   function stepDrop(){
