@@ -94,3 +94,13 @@ canvas{display:block; touch-action:none; border-radius:16px;
 .sitem.lock .sstate{color:#ffd98a}
 @keyframes nope{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 .sitem.shake{animation:nope .25s}
+
+/* ---- levels checklist bar ---- */
+.levelbar{flex:0 0 auto;display:none;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:5px 12px;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(255,255,255,.06)}
+.levelbar.show{display:flex}
+.levelbar .lvl{font-family:"Fraunces",serif;font-weight:900;font-size:13px;color:var(--amber);margin-right:2px}
+.lchip{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:12px;letter-spacing:.5px;
+  padding:3px 9px;border-radius:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#f3ead8}
+.lchip.done{background:rgba(91,196,126,.22);border-color:var(--good);color:#bff5d0;text-decoration:line-through;opacity:.85}
+.ltiles{margin-left:auto;font-size:11px;font-weight:800;color:#ffd98a;opacity:.85;white-space:nowrap}

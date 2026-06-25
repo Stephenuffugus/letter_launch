@@ -34,6 +34,8 @@
     <button class="iconbtn" id="restart">&#8635;</button>
   </div>
 
+  <div class="levelbar" id="levelbar"></div>
+
   <div class="stage" id="stage">
     <canvas id="cv"></canvas>
     <div class="word"><span class="chip" id="chip" style="display:none"></span></div>
@@ -59,9 +61,17 @@
         <b>Drop:</b> drag in the direction you want to fire (down / down-left / down-right) anywhere on screen, then release. The tile falls through the bumpers into a column. Longer drag = more power.<br><br>
         <b>Spell:</b> drag across touching tiles (incl. diagonals) to trace a word (3+ letters). Valid words clear and the stack drops.<br><br>
         <b>Streak:</b> clear another word before the timer runs out to build a multiplier — x2, x3, and up.<br><br>
-        <b>Charge:</b> bounce a tile off a gold &#9733; bumper and it lands charged — worth double its letter value in any word.
+        <b>Charge:</b> bounce a tile off a gold &#9733; bumper and it lands charged — worth double its letter value in any word.<br><br>
+        <b>Levels:</b> tap the mode pill to reach Levels. You're dealt exactly the tiles to build the words on the checklist — clear the list to win, then climb.
       </div>
       <button class="btn" id="helpClose">Got it</button>
+    </div>
+
+    <div class="overlay" id="levelover">
+      <h2 id="levelTitle">Level Cleared!</h2>
+      <div class="fs" id="levelNum">1</div>
+      <div class="best" id="levelSub"></div>
+      <button class="btn" id="levelNext">Next Level &rarr;</button>
     </div>
   </div>
 </div>
@@ -72,6 +82,7 @@
 <script src="audio.js"></script>
 <script src="share.js"></script>
 <script src="store.js"></script>
+<script src="levels.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

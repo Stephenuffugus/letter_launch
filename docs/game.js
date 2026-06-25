@@ -102,16 +102,31 @@
   let streak=0, comboUntil=0, maxStreak=0;
   let playedWords=[];               // every valid word cleared (for the haiku card)
   let lastResult=null;              // snapshot for the share card (built on game over)
+  // levels mode
+  let level=LS.get('level',1);      // current level number (1-based)
+  let levelData=null, deal=[], dealIdx=0, launched=0, targets=[];
 
   const cellX=c=>GX0+c*CELL+CELL/2, cellY=r=>BOARD_TOP+r*CELL+CELL/2;
   function newGrid(){grid=[];for(let r=0;r<ROWS;r++)grid.push(new Array(COLS).fill(null));}
+  // ---- levels ----
+  const LEVELS=()=>window.LL_LEVELS||[];
+  function loadLevel(){
+    const arr=LEVELS(); if(!arr.length){ levelData=null; deal=[]; targets=[]; dealIdx=0; return; }
+    if(level<1||level>arr.length) level=1;
+    levelData=arr[level-1];
+    deal=levelData.deal.split(''); dealIdx=0;
+    targets=levelData.words.map(w=>({w:w,done:false}));
+  }
+  const nextLetter=()=> (mode==='level') ? (dealIdx<deal.length?deal[dealIdx++]:'') : randLetter();
   function reset(){
     setupRng();                     // (re)seed the letter stream for the current mode
-    newGrid(); score=0; gameOver=false; ball=null; drop=null; particles=[]; floaters=[]; chain=[]; tracing=false; aiming=false; streak=0; comboUntil=0; maxStreak=0; playedWords=[]; lastResult=null;
-    queue=[randLetter(),randLetter(),randLetter()]; current=randLetter();
+    if(mode==='level') loadLevel();
+    newGrid(); score=0; gameOver=false; ball=null; drop=null; particles=[]; floaters=[]; chain=[]; tracing=false; aiming=false; streak=0; comboUntil=0; maxStreak=0; playedWords=[]; lastResult=null; launched=0;
+    queue=[nextLetter(),nextLetter(),nextLetter()]; current=nextLetter();
     document.getElementById('over').classList.remove('show');
-    msg(mode==='daily'?('Daily '+prettyDate(todayKey())+' — drag to aim.'):'Drag down to aim, release to drop.');
-    updateHUD(); syncMode();
+    const lo=document.getElementById('levelover'); if(lo) lo.classList.remove('show');
+    msg(mode==='level'?('Level '+level+' — build the words on the list!'):(mode==='daily'?('Daily '+prettyDate(todayKey())+' — drag to aim.'):'Drag down to aim, release to drop.'));
+    updateHUD(); syncMode(); renderLevelBar();
   }
   function lowestEmpty(c){for(let r=ROWS-1;r>=0;r--) if(!grid[r][c]) return r; return -1;}
   function nearestOpenCol(c){for(let d=1;d<COLS;d++){if(c-d>=0&&lowestEmpty(c-d)>=0)return c-d;if(c+d<COLS&&lowestEmpty(c+d)>=0)return c+d;}return -1;}
@@ -165,29 +180,39 @@
     if(!drop)return;
     drop.vy+=GRAV*1.5; drop.y+=drop.vy; const ty=cellY(drop.r);
     if(drop.y>=ty){grid[drop.r][drop.c]={l:drop.letter,pop:1,bonus:!!drop.bonus};ping(cellX(drop.c),ty,drop.bonus?'#ffcf4d':'#eaa53b',drop.bonus?9:6);sfx('lock');drop=null;
-      current=queue.shift();queue.push(randLetter());updateHUD();}
+      launched++; current=queue.shift();queue.push(nextLetter());updateHUD();renderLevelBar();}
   }
 
   // ---- words + streak ----
   const adjacent=(a,b)=>Math.abs(a.r-b.r)<=1&&Math.abs(a.c-b.c)<=1&&!(a.r===b.r&&a.c===b.c);
   const inChain=(r,c)=>chain.some(p=>p.r===r&&p.c===c);
   const chainWord=()=>chain.map(p=>grid[p.r][p.c].l).join('');
+  function scoreAndClear(w){       // score the chain, clear its tiles, collapse; returns points gained
+    const now=performance.now();
+    streak=(now<comboUntil)?Math.min(streak+1,MULT_CAP):1; comboUntil=now+COMBO_MS;
+    if(streak>maxStreak)maxStreak=streak;
+    let base=0;for(const p of chain){const cl=grid[p.r][p.c];base+=(VALUES[cl.l.toLowerCase()]||1)*(cl.bonus?PAD_MULT:1);}
+    const gained=base*w.length*streak; score+=gained;
+    playedWords.push(w.toLowerCase());
+    let cx=0,cy=0;
+    for(const p of chain){cx+=cellX(p.c);cy+=cellY(p.r);ping(cellX(p.c),cellY(p.r),'#5bc47e',10);grid[p.r][p.c]=null;}
+    floaters.push({x:cx/chain.length,y:cy/chain.length,txt:'+'+gained+(streak>1?'  x'+streak:''),life:1});
+    collapse();chip(w,'good');
+    sfx('word',w.length,streak); if(streak>=2)sfx('streakUp',streak);
+    return gained;
+  }
   function submitWord(){
-    const w=chainWord();
-    if(w.length>=MIN_WORD && DICT.has(w.toLowerCase())){
-      const now=performance.now();
-      streak=(now<comboUntil)?Math.min(streak+1,MULT_CAP):1; comboUntil=now+COMBO_MS;
-      if(streak>maxStreak)maxStreak=streak;
-      let base=0;for(const p of chain){const cl=grid[p.r][p.c];base+=(VALUES[cl.l.toLowerCase()]||1)*(cl.bonus?PAD_MULT:1);}
-      const gained=base*w.length*streak; score+=gained;
-      playedWords.push(w.toLowerCase());
-      let cx=0,cy=0;
-      for(const p of chain){cx+=cellX(p.c);cy+=cellY(p.r);ping(cellX(p.c),cellY(p.r),'#5bc47e',10);grid[p.r][p.c]=null;}
-      floaters.push({x:cx/chain.length,y:cy/chain.length,txt:'+'+gained+(streak>1?'  x'+streak:''),life:1});
-      collapse();chip(w,'good');
-      sfx('word',w.length,streak); if(streak>=2)sfx('streakUp',streak);
-      msg(w.toUpperCase()+' &rarr; +'+gained+(streak>1?' (x'+streak+' streak!)':''));
-    } else if(w.length>=MIN_WORD){chip(w,'bad');shake=10;sfx('bad');msg('&ldquo;'+w.toUpperCase()+'&rdquo; isn\u2019t in the list.');}
+    const w=chainWord(), lw=w.toLowerCase();
+    if(w.length>=MIN_WORD){
+      if(mode==='level'){                       // only words on the level's list count
+        const t=targets.find(x=>!x.done && x.w.toLowerCase()===lw);
+        if(t){ const g=scoreAndClear(w); t.done=true; renderLevelBar(); msg(w.toUpperCase()+' \u2713  +'+g);
+          if(targets.every(x=>x.done)) setTimeout(levelComplete,450); }
+        else if(DICT.has(lw)){ chip(w,'bad'); sfx('bad'); msg('&ldquo;'+w.toUpperCase()+'&rdquo; \u2014 not on the list.'); }
+        else { chip(w,'bad'); shake=10; sfx('bad'); msg('Not a word.'); }
+      } else if(DICT.has(lw)){ const g=scoreAndClear(w); msg(w.toUpperCase()+' &rarr; +'+g+(streak>1?' (x'+streak+' streak!)':'')); }
+      else { chip(w,'bad'); shake=10; sfx('bad'); msg('&ldquo;'+w.toUpperCase()+'&rdquo; isn\u2019t in the list.'); }
+    }
     chain=[];updateHUD();setTimeout(hideChip,650);
   }
   function collapse(){for(let c=0;c<COLS;c++){const st=[];for(let r=ROWS-1;r>=0;r--)if(grid[r][c])st.push(grid[r][c]);
@@ -208,6 +233,31 @@
   function chip(t,cls){chipEl.textContent=t.toUpperCase();chipEl.className='chip '+cls;chipEl.style.display='inline-block';}
   function liveChip(){const w=chainWord();if(w.length){const ok=w.length>=MIN_WORD&&DICT.has(w.toLowerCase());chipEl.textContent=w.toUpperCase();chipEl.className='chip'+(ok?' good':'');chipEl.style.display='inline-block';}else hideChip();}
   const hideChip=()=>chipEl.style.display='none';
+
+  // ---- levels: checklist bar + completion ----
+  function renderLevelBar(){
+    const bar=document.getElementById('levelbar'); if(!bar)return;
+    const was=bar.classList.contains('show');
+    if(mode!=='level'){ if(was){ bar.classList.remove('show'); bar.innerHTML=''; fit(); } return; }
+    const left=Math.max(0,deal.length-launched);
+    const chips=targets.map(t=>'<span class="lchip'+(t.done?' done':'')+'">'+t.w+'</span>').join('');
+    bar.innerHTML='<span class="lvl">Lv '+level+'</span>'+chips+'<span class="ltiles" title="tiles left">'+left+'●</span>';
+    bar.classList.add('show');
+    if(!was) fit();   // bar appeared → the stage got shorter, refit the canvas
+  }
+  function levelComplete(){
+    sfx('over'); setTimeout(()=>sfx('coin'),200);
+    if(window.LL_Store) window.LL_Store.addCoins(10);     // reward → spendable in the store
+    const cleared=level, last=cleared>=LEVELS().length;
+    level=last?1:level+1; LS.set('level',level);
+    const lo=document.getElementById('levelover');
+    if(!lo){ reset(); return; }
+    document.getElementById('levelTitle').textContent=last?('All '+LEVELS().length+' Levels Cleared! 🎉'):('Level '+cleared+' Cleared!');
+    document.getElementById('levelNum').textContent=cleared;
+    document.getElementById('levelSub').textContent=last?'You beat them all — looping to 1. More coming!':('Score '+score+'  •  +10 🪙');
+    document.getElementById('levelNext').textContent=last?'Play Again':'Next Level →';
+    lo.classList.add('show'); syncMode();
+  }
 
   function endGame(){
     gameOver=true;
@@ -255,7 +305,7 @@
     if(gameOver)return;e.preventDefault();const p=pos(e);
     const cell=cellAt(p);
     if(cell){tracing=true;chain=[cell];liveChip();return;}
-    if(!ball&&!drop){aiming=true;aim={sx:p.x,sy:p.y,cx:p.x,cy:p.y};}
+    if(!ball&&!drop&&current){aiming=true;aim={sx:p.x,sy:p.y,cx:p.x,cy:p.y};}
   }
   function move(e){
     if(gameOver)return;const p=pos(e);
@@ -274,14 +324,18 @@
   cv.addEventListener('touchstart',down,{passive:false});cv.addEventListener('touchmove',move,{passive:false});window.addEventListener('touchend',up);
   document.getElementById('again').onclick=reset;
   document.getElementById('restart').onclick=reset;
+  { const ln=document.getElementById('levelNext'); if(ln) ln.onclick=reset; }
   const helpEl=document.getElementById('help');
   document.getElementById('helpBtn').onclick=()=>helpEl.classList.add('show');
   document.getElementById('helpClose').onclick=()=>helpEl.classList.remove('show');
 
   // ---- mode toggle (Daily / Free) ----
   const modeBtn=document.getElementById('modeBtn');
-  function syncMode(){ if(!modeBtn)return; const s=(mode==='daily')?currentStreak():0; modeBtn.textContent=(mode==='daily'?('Daily'+(s>=1?'  🔥'+s:'')):'Free'); }
-  if(modeBtn) modeBtn.onclick=()=>{ mode=(mode==='daily'?'free':'daily'); LS.set('mode',mode); reset(); };
+  function syncMode(){ if(!modeBtn)return;
+    if(mode==='level'){ modeBtn.textContent='Levels'; return; }
+    const s=(mode==='daily')?currentStreak():0; modeBtn.textContent=(mode==='daily'?('Daily'+(s>=1?'  🔥'+s:'')):'Free'); }
+  const MODES=['free','daily','level'];
+  if(modeBtn) modeBtn.onclick=()=>{ mode=MODES[(MODES.indexOf(mode)+1)%MODES.length]; if(mode==='level'&&!LEVELS().length)mode='free'; LS.set('mode',mode); reset(); };
 
   // ---- mute toggle ----
   const muteBtn=document.getElementById('muteBtn');
@@ -402,7 +456,7 @@
     ctx.beginPath();ctx.moveTo(a.x-22,a.y-30);ctx.lineTo(a.x-12,a.y-2);ctx.moveTo(a.x+22,a.y-30);ctx.lineTo(a.x+12,a.y-2);ctx.stroke();
     if(aiming){const v=dragVec();if(v.d>14){const ang=Math.atan2(v.y,v.x);ctx.strokeStyle=hexA(Lk.accent,.9);ctx.lineWidth=3;
       ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(a.x+Math.cos(ang)*40,a.y+Math.sin(ang)*40);ctx.stroke();}}
-    if(!ball&&!drop&&!gameOver) drawTile(a.x,a.y,current,42,false,0);
+    if(!ball&&!drop&&!gameOver&&current) drawTile(a.x,a.y,current,42,false,0);
   }
 
   // ---- loop ----
