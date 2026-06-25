@@ -33,6 +33,26 @@ ready, just say **"let's get started"** and we work top-down from Phase 1.
   letter value (bonus flag rides ball→drop→cell). Identical physics, so **sim stays 7/7**.
   Still open: one-shot "pop", score-pad, gate bumpers.
 - **Real PWA icons ✅** — `tools/make-icons.js` generates them dependency-free (felt + L tile).
+- **Levels mode (Phase 3) ✅** — **40** fixed, pre-verified word-list puzzles
+  (`tools/make-levels.js` → `docs/levels.js`); each level is dealt the *exact* letters
+  for its words, so it's never impossible (challenge is placement). Checklist bar +
+  level-cleared overlay; +10 coins per clear; progress at `letterlaunch.level`.
+- **Daily Climb / daily ascension ✅** — `mode==='climb'`: a **3-stage** seeded daily
+  puzzle generated in-browser from `LL_WORDPOOL` + the date seed (same for everyone,
+  always solvable, real words). Feeds the day-streak + share. Pill cycles Free→Daily→Climb→Levels.
+- **Playability fixes ✅** — a full column no longer ends the game; tiles **spill to the
+  nearest open column**, and it ends only when the *whole* board fills. Stuck-ball failsafe.
+
+---
+
+## ⚠️ Top of the list when we resume
+
+- **In-game BACK button** *(flagged in playtest 2026-06-25)* — there's no way to exit /
+  return while playing (most relevant **embedded in the Lucid Winds studio** GAME tab).
+  First confirm the context: does the studio's `ext` iframe wrapper already provide a back
+  header (per its `_sg` plan), or does Letter Launch need its own back/exit control
+  (e.g. `postMessage` to the host to close the iframe, or a menu/home affordance standalone)?
+  Build the right one once that's confirmed.
 
 ---
 
