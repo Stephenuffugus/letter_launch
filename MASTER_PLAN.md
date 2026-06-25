@@ -9,14 +9,30 @@ ready, just say **"let's get started"** and we work top-down from Phase 1.
 
 ---
 
-## ✅ Already done (this session)
+## ✅ Already done
 
+**Foundation:**
 - Renamed everything to **Letter Launch** (storage migrated to `letterlaunch.*`).
 - **Sound** (`audio.js`) — synthesized Web Audio SFX + persistent mute toggle.
 - **Seeded daily challenge** (`rng.js`) — Free/Daily pill; deterministic letter
-  stream per date; per-day best saved. *Foundation for the leaderboard.*
+  stream per date; per-day best saved.
 - **Share card** (`share.js`) — 1080×1350 PNG + text; Web Share / clipboard.
-- `build.js` rebuilds the single-file `letter-launch-standalone.html`.
+- `build.js` rebuilds the single-file standalone.
+
+**Shipped + deployed (this session):**
+- **Hosting — Phase 2.1 ✅** — restructured to `docs/` (the game) + `tools/` (dev
+  scripts), deployed to **GitHub Pages**. Live: <https://stephenuffugus.github.io/letter_launch/>
+  (root redirects to `/docs/`; optional: set Pages folder to `/docs` for a clean root).
+  `SHARE_URL` is set. Studio + both websites embed the live URL via iframe — see `EMBED.md`.
+- **Daily streak — Phase 2.3 ✅** — consecutive-day counter for the Daily (pill `Daily 🔥N`,
+  end-screen line, share text + card). Keys: `streak.count` / `streak.last`.
+- **Cosmetic store — Phase 3.1–3.2 ✅** — `store.js` (`window.LL_Store`): tile / felt /
+  launcher / trajectory skins; buy / equip / persist; LL_Store is the coin authority.
+  Topbar coin pill opens it; renderer reads `getStyle()` each frame. Pure cosmetic.
+- **Charger bumper — Phase 3.3 (partial) ✅** — gold ★ bumper charges a tile to 2× its
+  letter value (bonus flag rides ball→drop→cell). Identical physics, so **sim stays 7/7**.
+  Still open: one-shot "pop", score-pad, gate bumpers.
+- **Real PWA icons ✅** — `tools/make-icons.js` generates them dependency-free (felt + L tile).
 
 ---
 
@@ -132,5 +148,12 @@ Principle: never sell power that hurts the leaderboard's integrity.
 
 ## ▶️ When we resume — likely first move
 
-Either: **(A)** you paste the haiku engine and we finish Phase 1, or **(B)** we
-deploy + stand up the Supabase leaderboard (Phase 2.1–2.2). Tell me which and we go.
+Hosting is live and the depth layer (store + streak + charger) is in. The biggest
+remaining levers, in rough priority:
+- **(A) Leaderboard — Phase 2.2** (the next real retention win). Seeding is done;
+  stand up a tiny Supabase table `{day_key, name, score}` and post on daily game-over.
+  *Needs your Supabase project + anon key.*
+- **(B) Haiku engine — Phase 1.1.** Integration point is live (`window.makeHaiku`);
+  paste your engine as `docs/haiku.js` and the end card + share image pick it up.
+- **(C) More store content / bumper types** — both systems are built; adding items is cheap.
+- **(D) Real-device playtest pass** — tune the charger frequency/value and `CONFIG` feel.
