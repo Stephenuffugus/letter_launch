@@ -1,0 +1,10 @@
+# Local snapshots / superseded copies kept for safety, not shipped
+_archive/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log
+
+# Node (only dev tooling lives here; no deps are required to run the game)
+node_modules/

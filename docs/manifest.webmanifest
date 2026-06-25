@@ -1,0 +1,14 @@
+{
+  "name": "Letter Launch",
+  "short_name": "Letter Launch",
+  "description": "Launch letters through bumpers into a grid and trace words for points.",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#16302a",
+  "theme_color": "#16302a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
