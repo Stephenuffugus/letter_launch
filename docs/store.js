@@ -53,6 +53,8 @@
   const coins=()=>LS.get('coins',0);
   const setCoins=n=>LS.set('coins',Math.max(0,n|0));
   const addCoins=n=>{setCoins(coins()+(n|0));refreshHud();return coins();};
+  // one-time welcome bonus so a new player can try the store right away
+  if(!LS.get('welcome',false)){ setCoins(coins()+200); LS.set('welcome',true); }
 
   // ---- lookups + the style the renderer consumes ----
   const item=(t,id)=>CATALOG[t].find(i=>i.id===id)||CATALOG[t][0];
