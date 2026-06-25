@@ -4,13 +4,13 @@
  *   node sim.js
  */
 const W=560,H=760,COLS=7,CELL=72,GX0=28,BOARD_TOP=304,POWER=0.14,GRAV=0.42,R=22,MAX_PULL=150;
-const REST={peg:0.86,bouncer:1.08};
+const REST={peg:0.86,bouncer:1.08,charger:1.08};   // charger == bouncer physics
 const BUMPERS=[
   {bx:100,by:146,r:12,kind:'peg'},
   {bx:244,by:146,r:12,kind:'peg'},
   {bx:388,by:146,r:12,kind:'peg'},
   {bx:172,by:210,r:12,kind:'bouncer'},
-  {bx:316,by:210,r:12,kind:'bouncer'},
+  {bx:316,by:210,r:12,kind:'charger'},
   {bx:460,by:210,r:12,kind:'bouncer'},
   {bx:280,by:110,r:13,kind:'bouncer',move:{axis:'x',amp:120,speed:0.0018,phase:0}},
 ];
