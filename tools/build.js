@@ -13,7 +13,7 @@ const read=f=>fs.readFileSync(path.join(docs,f),'utf8');
 
 let html=read('index.html');
 const css=read('styles.css');
-const scripts=['dict.js','rng.js','audio.js','share.js','game.js'];
+const scripts=['dict.js','rng.js','audio.js','share.js','store.js','game.js'];
 
 // inline stylesheet
 html=html.replace(/<link rel="stylesheet" href="styles\.css">/,'<style>\n'+css+'\n</style>');

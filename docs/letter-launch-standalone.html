@@ -14,7 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Bricolage+Grotesque:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --felt:#20413a; --felt2:#16302a;
+  --felt0:#2b554b; --felt:#20413a; --felt2:#16302a;
   --tile:#f3e7cf; --tile-hi:#fffaf0; --tile-edge:#cdb488; --ink:#2c2417;
   --amber:#eaa53b; --amber-d:#c47e1d; --wood:#7c5024; --wood-d:#5a3917;
   --good:#5bc47e; --bad:#e0625c;
@@ -22,7 +22,7 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
 html,body{margin:0;padding:0;height:100%;overflow:hidden}
 body{
-  background:radial-gradient(120% 80% at 50% -5%, #2b554b 0%, var(--felt) 45%, var(--felt2) 100%);
+  background:radial-gradient(120% 80% at 50% -5%, var(--felt0) 0%, var(--felt) 45%, var(--felt2) 100%);
   font-family:"Bricolage Grotesque",system-ui,sans-serif; color:#f3ead8;
 }
 .app{height:100dvh; display:flex; flex-direction:column;
@@ -69,6 +69,8 @@ canvas{display:block; touch-action:none; border-radius:16px;
 .fs{font-family:"Fraunces",serif;font-weight:900;font-size:50px;color:var(--amber);line-height:.9;margin:2px}
 .coins{font-size:15px;color:#ffd98a;font-weight:700}
 .best{font-size:12px;opacity:.7}
+.streakline{display:none;font-size:14px;font-weight:800;color:#ffb24d;margin-top:2px}
+.streakline.show{display:block}
 .haiku{display:none; max-width:300px; margin:6px auto 0; padding:14px 18px; border-radius:14px;
   background:rgba(243,231,207,.08); border:1px solid rgba(243,231,207,.18);
   font-family:"Fraunces",serif; font-style:italic; font-size:16px; line-height:1.7; color:var(--tile); white-space:pre-line;}
@@ -85,6 +87,29 @@ canvas{display:block; touch-action:none; border-radius:16px;
 .helpcard{max-width:320px; font-size:13px; line-height:1.6; opacity:.9; text-align:left}
 .helpcard b{color:var(--amber)}
 
+/* ---- store ---- */
+#storeBtn{border-color:rgba(255,210,120,.5);background:rgba(255,210,120,.14);color:#ffd98a}
+@media (max-width:440px){ .brand{display:none} }
+.store{gap:8px}
+.storebal{font-size:15px;font-weight:800;color:#ffd98a}
+.storegrid{width:100%;max-width:360px;max-height:58vh;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:2px 4px}
+.sgroup{display:flex;flex-direction:column;gap:7px}
+.slabel{font-size:11px;text-transform:uppercase;letter-spacing:2px;opacity:.55;font-weight:800;text-align:left}
+.srow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.sitem{display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 4px 6px;border-radius:12px;cursor:pointer;
+  background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.1);color:#f3ead8;font-family:inherit}
+.sitem:active{transform:scale(.95)}
+.sitem.eq{border-color:var(--good);background:rgba(91,196,126,.16)}
+.sitem.lock{opacity:.55}
+.swatch{width:100%;aspect-ratio:1;border-radius:8px;border:1.5px solid rgba(0,0,0,.25);box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
+.sname{font-size:11px;font-weight:700;line-height:1}
+.sstate{font-size:10px;font-weight:800;opacity:.9;letter-spacing:.3px}
+.sitem.eq .sstate{color:var(--good)}
+.sitem.own:not(.eq) .sstate{color:#cfe8d8}
+.sitem.lock .sstate{color:#ffd98a}
+@keyframes nope{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.sitem.shake{animation:nope .25s}
+
 </style>
 </head>
 <body>
@@ -93,6 +118,7 @@ canvas{display:block; touch-action:none; border-radius:16px;
     <div class="score"><span class="lbl">Score</span><span class="val" id="score">0</span></div>
     <div class="brand">LETTER LAUNCH</div>
     <button class="pill" id="modeBtn" title="Toggle Daily / Free play">Free</button>
+    <button class="pill" id="storeBtn" title="Store — spend coins on skins">&#129689; 0</button>
     <div class="spacer"></div>
     <div class="next">
       <div class="qtile" id="q0">A</div>
@@ -114,6 +140,7 @@ canvas{display:block; touch-action:none; border-radius:16px;
       <div class="fs" id="finalScore">0</div>
       <div class="coins" id="coinsLine">&#9679; 0 coins earned</div>
       <div class="best" id="bestLine"></div>
+      <div class="streakline" id="streakLine"></div>
       <div class="haiku" id="haiku"></div>
       <div class="overbtns">
         <button class="btn ghost" id="shareBtn">Share</button>
@@ -278,6 +305,7 @@ window.DICT=new Set(window.WORDS.split(" "));
   function buildText(r){
     const lines=[];
     lines.push('Letter Launch'+(r.mode==='daily'?' — Daily '+prettyDate(r.dayKey):''));
+    if(r.mode==='daily'&&r.dayStreak>=2) lines.push('🔥 '+r.dayStreak+'-day streak');
     lines.push('Score '+fmt(r.score)+(r.maxStreak>=2?'   🔥 x'+r.maxStreak:''));
     if(r.longestWord) lines.push('Best word: '+r.longestWord.toUpperCase());
     if(r.wordCount) lines.push(r.wordCount+' word'+(r.wordCount===1?'':'s')+' cleared');
@@ -321,7 +349,9 @@ window.DICT=new Set(window.WORDS.split(" "));
     c.fillStyle='#eaa53b'; c.font='900 92px Fraunces, Georgia, serif';
     c.fillText('LETTER LAUNCH',W/2,180);
     c.fillStyle='rgba(243,234,216,.65)'; c.font='700 38px "Bricolage Grotesque", system-ui, sans-serif';
-    c.fillText((r.mode==='daily'?'Daily — '+prettyDate(r.dayKey):'Free Play'),W/2,240);
+    let sub=(r.mode==='daily'?'Daily — '+prettyDate(r.dayKey):'Free Play');
+    if(r.mode==='daily'&&r.dayStreak>=2) sub+='   ·   🔥 '+r.dayStreak+'-day';
+    c.fillText(sub,W/2,240);
 
     // big score
     c.fillStyle='rgba(243,234,216,.5)'; c.font='700 34px "Bricolage Grotesque", system-ui, sans-serif';
@@ -393,6 +423,148 @@ window.DICT=new Set(window.WORDS.split(" "));
 
 </script>
 <script>
+/* Letter Launch — cosmetic store (window.LL_Store)
+ * The coin authority + the cosmetics catalog + owned/equipped state (all in
+ * localStorage). Builds its own store overlay UI. game.js reads getStyle() each
+ * frame for tile / felt / launcher / trajectory colours, so equipping is instant.
+ * Pure cosmetic — never sells power. Loaded before game.js.
+ */
+(()=>{
+  'use strict';
+  const NS='letterlaunch.', OLD='slingspell.';
+  const LS={
+    get(k,d){try{let v=localStorage.getItem(NS+k);if(v==null)v=localStorage.getItem(OLD+k);return v==null?d:JSON.parse(v);}catch(e){return d;}},
+    set(k,v){try{localStorage.setItem(NS+k,JSON.stringify(v));}catch(e){}}
+  };
+
+  // ---- catalog (the first entry of each type is the free default, owned from the start) ----
+  const CATALOG={
+    tile:[
+      {id:'classic',  name:'Classic',  price:0,   hi:'#fffaf0', lo:'#f0e2c5', edge:'#cdb488', ink:'#2c2417'},
+      {id:'slate',    name:'Slate',    price:150, hi:'#6b7480', lo:'#434c59', edge:'#2c333d', ink:'#f3f6fa'},
+      {id:'bubblegum',name:'Bubblegum',price:200, hi:'#ffe0ef', lo:'#ff9fcb', edge:'#e070a6', ink:'#5e1a39'},
+      {id:'gold',     name:'Gold',     price:400, hi:'#fff3c8', lo:'#ecbe55', edge:'#b9831e', ink:'#4a3206'},
+    ],
+    felt:[
+      {id:'forest',  name:'Forest',  price:0,   a:'#2b554b', b:'#20413a', c:'#13241f', board:'#1d3b34'},
+      {id:'midnight',name:'Midnight',price:150, a:'#2a4570', b:'#1b2c4d', c:'#0e1626', board:'#1a2b4a'},
+      {id:'wine',    name:'Wine',    price:150, a:'#5f2842', b:'#421a2e', c:'#23101a', board:'#3b1a2a'},
+      {id:'dusk',    name:'Dusk',    price:250, a:'#7a4a6b', b:'#4d2f49', c:'#241726', board:'#3e2740'},
+    ],
+    launcher:[
+      {id:'oak',  name:'Oak',  price:0,   wood:'#7c5024', woodD:'#5a3917', accent:'#eaa53b'},
+      {id:'steel',name:'Steel',price:120, wood:'#7c8794', woodD:'#525c68', accent:'#bfe6da'},
+      {id:'candy',name:'Candy',price:120, wood:'#d65b86', woodD:'#a13a60', accent:'#ffd2e2'},
+    ],
+    trail:[
+      {id:'dots', name:'Dots',  price:0,   color:'#ffffff'},
+      {id:'ember',name:'Ember', price:100, color:'#ff7a3c'},
+      {id:'mint', name:'Mint',  price:100, color:'#7af2c4'},
+    ],
+  };
+  const TYPES=Object.keys(CATALOG);
+  const LABELS={tile:'Tiles', felt:'Felt', launcher:'Launcher', trail:'Trail'};
+
+  // ---- owned / equipped state ----
+  let owned=LS.get('owned',{}), equipped=LS.get('equipped',{});
+  for(const t of TYPES){                       // defaults are always owned + a valid equip
+    owned[CATALOG[t][0].id]=true;
+    if(!equipped[t]||!CATALOG[t].some(i=>i.id===equipped[t])) equipped[t]=CATALOG[t][0].id;
+  }
+  const saveState=()=>{LS.set('owned',owned);LS.set('equipped',equipped);};
+  saveState();
+
+  // ---- coins (LL_Store is the single source of truth) ----
+  const coins=()=>LS.get('coins',0);
+  const setCoins=n=>LS.set('coins',Math.max(0,n|0));
+  const addCoins=n=>{setCoins(coins()+(n|0));refreshHud();return coins();};
+
+  // ---- lookups + the style the renderer consumes ----
+  const item=(t,id)=>CATALOG[t].find(i=>i.id===id)||CATALOG[t][0];
+  const eq=t=>item(t,equipped[t]);
+  const getStyle=()=>({tile:eq('tile'),felt:eq('felt'),launcher:eq('launcher'),trail:eq('trail')});
+
+  // keep the CSS letterbox background in sync with the felt theme
+  function applyFeltVars(){const f=eq('felt'),r=document.documentElement.style;r.setProperty('--felt0',f.a);r.setProperty('--felt',f.b);r.setProperty('--felt2',f.c);}
+
+  let onChange=null;                            // game.js hook (refresh topbar coin pill)
+  const setOnChange=fn=>{onChange=fn;refreshHud();};
+
+  // ---- buy / equip ----
+  function buy(t,id){const it=item(t,id);if(owned[id])return equip(t,id);if(coins()<it.price)return false;
+    setCoins(coins()-it.price);owned[id]=true;equipped[t]=id;saveState();afterChange();return true;}
+  function equip(t,id){if(!owned[id])return false;equipped[t]=id;saveState();afterChange();return true;}
+  function afterChange(){applyFeltVars();renderGrid();refreshHud();}
+
+  // ================= UI =================
+  let el=null, gridEl=null, coinEls=[];
+  function build(){
+    if(el) return;
+    el=document.createElement('div'); el.className='overlay store'; el.id='store';
+    el.innerHTML=
+      '<h2>Store</h2>'+
+      '<div class="storebal">&#129689; <span class="storeCoins">0</span> coins</div>'+
+      '<div class="storegrid"></div>'+
+      '<button class="btn" id="storeClose">Done</button>';
+    const stage=document.getElementById('stage')||document.body;
+    stage.appendChild(el);
+    gridEl=el.querySelector('.storegrid');
+    coinEls=[].slice.call(el.querySelectorAll('.storeCoins'));
+    el.querySelector('#storeClose').onclick=close;
+  }
+  function swatchStyle(t,it){
+    if(t==='tile')     return 'background:linear-gradient(180deg,'+it.hi+','+it.lo+');border-color:'+it.edge;
+    if(t==='felt')     return 'background:linear-gradient(135deg,'+it.a+' 0%,'+it.b+' 60%,'+it.c+' 100%)';
+    if(t==='launcher') return 'background:linear-gradient(180deg,'+it.wood+','+it.woodD+')';
+    return 'background:radial-gradient(circle at 50% 45%,'+it.color+' 0 22%,transparent 24%),'+
+           'radial-gradient(circle at 28% 70%,'+it.color+' 0 16%,transparent 18%),'+
+           'radial-gradient(circle at 72% 70%,'+it.color+' 0 16%,transparent 18%),#1d3b34';
+  }
+  function renderGrid(){
+    if(!gridEl) return;
+    let html='';
+    for(const t of TYPES){
+      html+='<div class="sgroup"><div class="slabel">'+LABELS[t]+'</div><div class="srow">';
+      for(const it of CATALOG[t]){
+        const isEq=equipped[t]===it.id, own=!!owned[it.id], afford=coins()>=it.price;
+        const state=isEq?'Equipped':(own?'Owned':('&#129689; '+it.price));
+        const cls='sitem'+(isEq?' eq':'')+(own?' own':'')+(!own&&!afford?' lock':'');
+        html+='<button class="'+cls+'" data-t="'+t+'" data-id="'+it.id+'">'+
+              '<span class="swatch" style="'+swatchStyle(t,it)+'"></span>'+
+              '<span class="sname">'+it.name+'</span>'+
+              '<span class="sstate">'+state+'</span></button>';
+      }
+      html+='</div></div>';
+    }
+    gridEl.innerHTML=html;
+    [].forEach.call(gridEl.querySelectorAll('.sitem'),b=>{
+      b.onclick=()=>{
+        const t=b.getAttribute('data-t'), id=b.getAttribute('data-id');
+        if(owned[id]) equip(t,id);
+        else if(!buy(t,id)){ b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); }
+      };
+    });
+  }
+  function refreshHud(){
+    const c=coins();
+    coinEls.forEach(s=>s.textContent=c);
+    if(onChange) onChange(c);
+  }
+
+  function open(){ build(); applyFeltVars(); renderGrid(); refreshHud(); el.classList.add('show'); }
+  function close(){ if(el) el.classList.remove('show'); }
+  const isOpen=()=>!!el&&el.classList.contains('show');
+
+  applyFeltVars();   // theme the page background on load, before the store is ever opened
+
+  window.LL_Store={
+    getStyle, coins, addCoins, buy, equip, isOwned:id=>!!owned[id],
+    open, close, isOpen, setOnChange, CATALOG,
+  };
+})();
+
+</script>
+<script>
 /* SlingSpell — game logic
  * Depends on dict.js (defines window.DICT : Set<string>) loaded before this file.
  * All tunable values live in the CONFIG block below.
@@ -452,11 +624,28 @@ window.DICT=new Set(window.WORDS.split(" "));
   const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const todayKey=()=>window.LL_RNG?window.LL_RNG.dayKey():'';
   const prettyDate=key=>{if(!key)return'';const p=key.split('-');return MONTHS[(+p[1])-1]+' '+(+p[2]);};
+  // ---- daily streak: consecutive days the Daily challenge was completed ----
+  const yesterdayKey=()=>{const d=new Date();d.setDate(d.getDate()-1);return window.LL_RNG?window.LL_RNG.dayKey(d):'';};
+  function currentStreak(){                 // live streak for display (0 once a day is missed)
+    const last=LS.get('streak.last',''), n=LS.get('streak.count',0);
+    return (last===todayKey()||last===yesterdayKey())?n:0;
+  }
+  function bumpStreak(){                     // called once when a Daily run ends (idempotent within a day)
+    const today=todayKey(), last=LS.get('streak.last','');
+    let n=LS.get('streak.count',0);
+    if(last!==today) n=(last===yesterdayKey())?n+1:1;
+    LS.set('streak.count',n); LS.set('streak.last',today); return n;
+  }
   function setupRng(){
     if(mode==='daily'&&window.LL_RNG) rng=window.LL_RNG.seeded('LL-'+todayKey());
     else rng=Math.random;
   }
   const sfx=(name,...a)=>{if(window.LL_Audio)window.LL_Audio.play(name,...a);};
+
+  // ---- cosmetics (from window.LL_Store; falls back to the classic look) ----
+  const DEFAULT_SKIN={tile:{hi:'#fffaf0',lo:'#f0e2c5',edge:'#cdb488',ink:'#2c2417'},felt:{board:'#1d3b34'},launcher:{wood:'#7c5024',woodD:'#5a3917',accent:'#eaa53b'},trail:{color:'#ffffff'}};
+  const skin=()=>window.LL_Store?window.LL_Store.getStyle():DEFAULT_SKIN;
+  const hexA=(hex,a)=>{hex=String(hex).replace('#','');if(hex.length===3)hex=hex.split('').map(x=>x+x).join('');const n=parseInt(hex,16);return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';};
 
   // ---- canvas + responsive fit ----
   const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -576,20 +765,24 @@ window.DICT=new Set(window.WORDS.split(" "));
   function endGame(){
     gameOver=true;
     const earned=Math.floor(score/COIN_RATE);
-    best=Math.max(best,score); coins+=earned;
-    LS.set('best',best); LS.set('coins',coins);
+    best=Math.max(best,score); LS.set('best',best);
+    coins = window.LL_Store ? window.LL_Store.addCoins(earned) : (coins+earned);
+    if(!window.LL_Store) LS.set('coins',coins);
     const dk=todayKey();
-    let dailyBest=score;
-    if(mode==='daily'){ dailyBest=Math.max(LS.get('daily.'+dk,0),score); LS.set('daily.'+dk,dailyBest); }
+    let dailyBest=score, dayStreak=0;
+    if(mode==='daily'){ dailyBest=Math.max(LS.get('daily.'+dk,0),score); LS.set('daily.'+dk,dailyBest); dayStreak=bumpStreak(); }
     const haiku=haikuText();
     const sorted=playedWords.slice().sort((a,b)=>b.length-a.length);
-    lastResult={mode,dayKey:dk,score,best,maxStreak,longestWord:sorted[0]||'',words:sorted,wordCount:playedWords.length,coins:earned,haiku};
+    lastResult={mode,dayKey:dk,score,best,maxStreak,longestWord:sorted[0]||'',words:sorted,wordCount:playedWords.length,coins:earned,haiku,dayStreak};
     document.getElementById('finalScore').textContent=score;
     document.getElementById('coinsLine').innerHTML='&#9679; +'+earned+' coins  (total '+coins+')';
     document.getElementById('bestLine').textContent=(mode==='daily'?('Daily '+prettyDate(dk)+' best: '+dailyBest):('Best: '+best));
+    const streakEl=document.getElementById('streakLine');
+    if(streakEl){ const show=mode==='daily'&&dayStreak>=1; streakEl.textContent=show?('🔥 '+dayStreak+'-day streak'+(dayStreak>=2?'!':'')):''; streakEl.classList.toggle('show',show); }
     showHaiku(haiku);
     document.getElementById('over').classList.add('show');
     sfx('over'); if(earned>0)setTimeout(()=>sfx('coin'),320);
+    syncMode();   // refresh the pill's streak badge
   }
 
   // ---- HAIKU INTEGRATION POINT ----
@@ -640,13 +833,20 @@ window.DICT=new Set(window.WORDS.split(" "));
 
   // ---- mode toggle (Daily / Free) ----
   const modeBtn=document.getElementById('modeBtn');
-  function syncMode(){ if(modeBtn) modeBtn.textContent = (mode==='daily'?'Daily':'Free'); }
+  function syncMode(){ if(!modeBtn)return; const s=(mode==='daily')?currentStreak():0; modeBtn.textContent=(mode==='daily'?('Daily'+(s>=1?'  🔥'+s:'')):'Free'); }
   if(modeBtn) modeBtn.onclick=()=>{ mode=(mode==='daily'?'free':'daily'); LS.set('mode',mode); reset(); };
 
   // ---- mute toggle ----
   const muteBtn=document.getElementById('muteBtn');
   function syncMute(){ if(!muteBtn)return; const m=window.LL_Audio?window.LL_Audio.isMuted():false; muteBtn.textContent=m?'🔇':'🔊'; }
   if(muteBtn){ muteBtn.onclick=()=>{ if(window.LL_Audio)window.LL_Audio.toggle(); syncMute(); }; syncMute(); }
+
+  // ---- store (cosmetics; window.LL_Store) ----
+  const storeBtn=document.getElementById('storeBtn');
+  function syncCoins(c){ if(storeBtn) storeBtn.textContent='🪙 '+(c!=null?c:(window.LL_Store?window.LL_Store.coins():coins)); }
+  if(storeBtn) storeBtn.onclick=()=>{ if(window.LL_Store) window.LL_Store.open(); };
+  if(window.LL_Store) window.LL_Store.setOnChange(syncCoins);
+  syncCoins();
 
   // ---- share ----
   const shareBtn=document.getElementById('shareBtn'), shareStatusEl=document.getElementById('shareStatus');
@@ -676,14 +876,15 @@ window.DICT=new Set(window.WORDS.split(" "));
   // ---- render ----
   function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
   function drawTile(cx,cy,letter,size,sel,pop){
+    const T=skin().tile;
     const s=size*(pop?1+0.18*pop:1);ctx.save();ctx.translate(cx,cy);
     ctx.shadowColor='rgba(0,0,0,.4)';ctx.shadowBlur=8;ctx.shadowOffsetY=3;
-    const g=ctx.createLinearGradient(0,-s/2,0,s/2);g.addColorStop(0,'#fffaf0');g.addColorStop(1,'#f0e2c5');
+    const g=ctx.createLinearGradient(0,-s/2,0,s/2);g.addColorStop(0,T.hi);g.addColorStop(1,T.lo);
     ctx.fillStyle=g;roundRect(-s/2,-s/2,s,s,10);ctx.fill();ctx.shadowColor='transparent';
-    ctx.fillStyle='rgba(205,180,136,.9)';roundRect(-s/2,s/2-5,s,5,3);ctx.fill();
+    ctx.fillStyle=T.edge;roundRect(-s/2,s/2-5,s,5,3);ctx.fill();
     if(sel){ctx.strokeStyle='#5bc47e';ctx.lineWidth=4;roundRect(-s/2,-s/2,s,s,10);ctx.stroke();}
-    ctx.fillStyle='#2c2417';ctx.font='900 '+(s*0.56)+'px Fraunces,Georgia,serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(letter,0,2);
-    ctx.font='700 '+(s*0.18)+'px Bricolage Grotesque,sans-serif';ctx.fillStyle='rgba(44,36,23,.6)';ctx.textAlign='right';ctx.fillText(VALUES[letter.toLowerCase()]||1,s/2-7,s/2-8);
+    ctx.fillStyle=T.ink;ctx.font='900 '+(s*0.56)+'px Fraunces,Georgia,serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(letter,0,2);
+    ctx.font='700 '+(s*0.18)+'px Bricolage Grotesque,sans-serif';ctx.fillStyle=hexA(T.ink,0.55);ctx.textAlign='right';ctx.fillText(VALUES[letter.toLowerCase()]||1,s/2-7,s/2-8);
     ctx.restore();
   }
   function drawBumper(b){
@@ -707,7 +908,7 @@ window.DICT=new Set(window.WORDS.split(" "));
   function render(){
     let sx=0,sy=0;if(shake>0){sx=(Math.random()-.5)*shake;sy=(Math.random()-.5)*shake;}
     ctx.save();ctx.translate(sx,sy);ctx.clearRect(-20,-20,W+40,H+40);
-    ctx.fillStyle='#1d3b34';roundRect(0,0,W,H,16);ctx.fill();
+    ctx.fillStyle=skin().felt.board;roundRect(0,0,W,H,16);ctx.fill();
 
     ctx.fillStyle='rgba(0,0,0,.18)';roundRect(GX0-4,BOARD_TOP-6,GRID_W+8,ROWS*CELL+12,16);ctx.fill();
     for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){ctx.fillStyle='rgba(0,0,0,.16)';roundRect(GX0+c*CELL+6,BOARD_TOP+r*CELL+6,CELL-12,CELL-12,9);ctx.fill();}
@@ -720,7 +921,7 @@ window.DICT=new Set(window.WORDS.split(" "));
 
     drawLauncher();
 
-    if(aiming){const pts=previewPts();ctx.fillStyle='#fff';pts.forEach((p,i)=>{ctx.globalAlpha=0.8-i/pts.length*0.6;ctx.beginPath();ctx.arc(p.x,p.y,3.2,0,7);ctx.fill();});ctx.globalAlpha=1;}
+    if(aiming){const pts=previewPts();ctx.fillStyle=skin().trail.color;pts.forEach((p,i)=>{ctx.globalAlpha=0.8-i/pts.length*0.6;ctx.beginPath();ctx.arc(p.x,p.y,3.2,0,7);ctx.fill();});ctx.globalAlpha=1;}
 
     if(drop)drawTile(cellX(drop.c),drop.y,drop.letter,CELL-14,false,0);
     if(ball){ctx.save();ctx.translate(ball.x,ball.y);ctx.rotate(ball.rot);drawTile(0,0,ball.letter,BALL_R*2,false,0);ctx.restore();}
@@ -739,11 +940,11 @@ window.DICT=new Set(window.WORDS.split(" "));
     ctx.restore();
   }
   function drawLauncher(){
-    const a=ANCHOR;
-    ctx.fillStyle='#5a3917';roundRect(a.x-30,a.y-40,60,14,5);ctx.fill();
-    ctx.strokeStyle='#7c5024';ctx.lineWidth=8;ctx.lineCap='round';
+    const a=ANCHOR, Lk=skin().launcher;
+    ctx.fillStyle=Lk.woodD;roundRect(a.x-30,a.y-40,60,14,5);ctx.fill();
+    ctx.strokeStyle=Lk.wood;ctx.lineWidth=8;ctx.lineCap='round';
     ctx.beginPath();ctx.moveTo(a.x-22,a.y-30);ctx.lineTo(a.x-12,a.y-2);ctx.moveTo(a.x+22,a.y-30);ctx.lineTo(a.x+12,a.y-2);ctx.stroke();
-    if(aiming){const v=dragVec();if(v.d>14){const ang=Math.atan2(v.y,v.x);ctx.strokeStyle='rgba(234,165,59,.9)';ctx.lineWidth=3;
+    if(aiming){const v=dragVec();if(v.d>14){const ang=Math.atan2(v.y,v.x);ctx.strokeStyle=hexA(Lk.accent,.9);ctx.lineWidth=3;
       ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(a.x+Math.cos(ang)*40,a.y+Math.sin(ang)*40);ctx.stroke();}}
     if(!ball&&!drop&&!gameOver) drawTile(a.x,a.y,current,42,false,0);
   }

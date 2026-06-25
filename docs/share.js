@@ -17,6 +17,7 @@
   function buildText(r){
     const lines=[];
     lines.push('Letter Launch'+(r.mode==='daily'?' — Daily '+prettyDate(r.dayKey):''));
+    if(r.mode==='daily'&&r.dayStreak>=2) lines.push('🔥 '+r.dayStreak+'-day streak');
     lines.push('Score '+fmt(r.score)+(r.maxStreak>=2?'   🔥 x'+r.maxStreak:''));
     if(r.longestWord) lines.push('Best word: '+r.longestWord.toUpperCase());
     if(r.wordCount) lines.push(r.wordCount+' word'+(r.wordCount===1?'':'s')+' cleared');
@@ -60,7 +61,9 @@
     c.fillStyle='#eaa53b'; c.font='900 92px Fraunces, Georgia, serif';
     c.fillText('LETTER LAUNCH',W/2,180);
     c.fillStyle='rgba(243,234,216,.65)'; c.font='700 38px "Bricolage Grotesque", system-ui, sans-serif';
-    c.fillText((r.mode==='daily'?'Daily — '+prettyDate(r.dayKey):'Free Play'),W/2,240);
+    let sub=(r.mode==='daily'?'Daily — '+prettyDate(r.dayKey):'Free Play');
+    if(r.mode==='daily'&&r.dayStreak>=2) sub+='   ·   🔥 '+r.dayStreak+'-day';
+    c.fillText(sub,W/2,240);
 
     // big score
     c.fillStyle='rgba(243,234,216,.5)'; c.font='700 34px "Bricolage Grotesque", system-ui, sans-serif';
