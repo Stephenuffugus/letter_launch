@@ -102,9 +102,10 @@
   let streak=0, comboUntil=0, maxStreak=0;
   let playedWords=[];               // every valid word cleared (for the haiku card)
   let lastResult=null;              // snapshot for the share card (built on game over)
-  // levels mode
-  let level=LS.get('level',1);      // current level number (1-based)
+  // levels + daily climb (puzzle modes)
+  let level=LS.get('level',1);      // current campaign level number (1-based)
   let levelData=null, deal=[], dealIdx=0, launched=0, targets=[];
+  let climbStage=0;                 // daily ascension: current stage (0..2)
 
   const cellX=c=>GX0+c*CELL+CELL/2, cellY=r=>BOARD_TOP+r*CELL+CELL/2;
   function newGrid(){grid=[];for(let r=0;r<ROWS;r++)grid.push(new Array(COLS).fill(null));}
@@ -117,15 +118,38 @@
     deal=levelData.deal.split(''); dealIdx=0;
     targets=levelData.words.map(w=>({w:w,done:false}));
   }
-  const nextLetter=()=> (mode==='level') ? (dealIdx<deal.length?deal[dealIdx++]:'') : randLetter();
+  // ---- daily climb: 3 escalating puzzles, generated from the date seed + shared pools ----
+  const CLIMB_STAGES=[{count:3,lens:[3,4,4]},{count:4,lens:[4,5,5,5]},{count:5,lens:[5,5,6,6,5]}];
+  function genPuzzle(seedStr,spec){
+    const pool=window.LL_WORDPOOL;
+    if(!pool){ return {words:['CAT','SUN','TOP'],deal:'CATSUNTOP'}; }
+    const rnd=window.LL_RNG?window.LL_RNG.seeded(seedStr):Math.random;
+    const words=[];
+    for(let i=0;i<spec.count;i++){
+      const len=spec.lens[i%spec.lens.length], arr=pool[len]||pool[5]||[];
+      if(!arr.length) continue;
+      let w,guard=0; do{ w=arr[(rnd()*arr.length)|0]; guard++; }while(words.indexOf(w)>=0 && guard<40);
+      words.push(String(w).toUpperCase());
+    }
+    const ls=words.join('').split('');
+    for(let i=ls.length-1;i>0;i--){const j=(rnd()*(i+1))|0,t=ls[i];ls[i]=ls[j];ls[j]=t;}
+    return {words,deal:ls.join('')};
+  }
+  function loadClimb(){
+    const spec=CLIMB_STAGES[Math.max(0,Math.min(CLIMB_STAGES.length-1,climbStage))];
+    const p=genPuzzle('LLA-'+todayKey()+'-'+climbStage,spec);
+    deal=p.deal.split(''); dealIdx=0;
+    targets=p.words.map(w=>({w:w,done:false}));
+  }
+  const nextLetter=()=> (mode==='level'||mode==='climb') ? (dealIdx<deal.length?deal[dealIdx++]:'') : randLetter();
   function reset(){
     setupRng();                     // (re)seed the letter stream for the current mode
-    if(mode==='level') loadLevel();
+    if(mode==='level') loadLevel(); else if(mode==='climb') loadClimb();
     newGrid(); score=0; gameOver=false; ball=null; drop=null; particles=[]; floaters=[]; chain=[]; tracing=false; aiming=false; streak=0; comboUntil=0; maxStreak=0; playedWords=[]; lastResult=null; launched=0;
     queue=[nextLetter(),nextLetter(),nextLetter()]; current=nextLetter();
     document.getElementById('over').classList.remove('show');
     const lo=document.getElementById('levelover'); if(lo) lo.classList.remove('show');
-    msg(mode==='level'?('Level '+level+' — build the words on the list!'):(mode==='daily'?('Daily '+prettyDate(todayKey())+' — drag to aim.'):'Drag down to aim, release to drop.'));
+    msg(mode==='climb'?('Daily Climb — stage '+(climbStage+1)+' of 3'):(mode==='level'?('Level '+level+' — build the words on the list!'):(mode==='daily'?('Daily '+prettyDate(todayKey())+' — drag to aim.'):'Drag down to aim, release to drop.')));
     updateHUD(); syncMode(); renderLevelBar();
   }
   function lowestEmpty(c){for(let r=ROWS-1;r>=0;r--) if(!grid[r][c]) return r; return -1;}
@@ -204,10 +228,10 @@
   function submitWord(){
     const w=chainWord(), lw=w.toLowerCase();
     if(w.length>=MIN_WORD){
-      if(mode==='level'){                       // only words on the level's list count
+      if(mode==='level'||mode==='climb'){       // only words on the checklist count
         const t=targets.find(x=>!x.done && x.w.toLowerCase()===lw);
         if(t){ const g=scoreAndClear(w); t.done=true; renderLevelBar(); msg(w.toUpperCase()+' \u2713  +'+g);
-          if(targets.every(x=>x.done)) setTimeout(levelComplete,450); }
+          if(targets.every(x=>x.done)) setTimeout(mode==='climb'?climbAdvance:levelComplete,450); }
         else if(DICT.has(lw)){ chip(w,'bad'); sfx('bad'); msg('&ldquo;'+w.toUpperCase()+'&rdquo; \u2014 not on the list.'); }
         else { chip(w,'bad'); shake=10; sfx('bad'); msg('Not a word.'); }
       } else if(DICT.has(lw)){ const g=scoreAndClear(w); msg(w.toUpperCase()+' &rarr; +'+g+(streak>1?' (x'+streak+' streak!)':'')); }
@@ -238,10 +262,11 @@
   function renderLevelBar(){
     const bar=document.getElementById('levelbar'); if(!bar)return;
     const was=bar.classList.contains('show');
-    if(mode!=='level'){ if(was){ bar.classList.remove('show'); bar.innerHTML=''; fit(); } return; }
+    if(mode!=='level'&&mode!=='climb'){ if(was){ bar.classList.remove('show'); bar.innerHTML=''; fit(); } return; }
     const left=Math.max(0,deal.length-launched);
+    const lbl=mode==='climb'?('Climb '+(climbStage+1)+'/3'):('Lv '+level);
     const chips=targets.map(t=>'<span class="lchip'+(t.done?' done':'')+'">'+t.w+'</span>').join('');
-    bar.innerHTML='<span class="lvl">Lv '+level+'</span>'+chips+'<span class="ltiles" title="tiles left">'+left+'●</span>';
+    bar.innerHTML='<span class="lvl">'+lbl+'</span>'+chips+'<span class="ltiles" title="tiles left">'+left+'●</span>';
     bar.classList.add('show');
     if(!was) fit();   // bar appeared → the stage got shorter, refit the canvas
   }
@@ -258,9 +283,43 @@
     document.getElementById('levelNext').textContent=last?'Play Again':'Next Level →';
     lo.classList.add('show'); syncMode();
   }
+  function climbAdvance(){
+    const cleared=climbStage+1;
+    if(climbStage<CLIMB_STAGES.length-1){
+      climbStage++; sfx('streakUp',2);
+      const lo=document.getElementById('levelover');
+      if(!lo){ reset(); return; }
+      document.getElementById('levelTitle').textContent='Stage '+cleared+' of 3 cleared!';
+      document.getElementById('levelNum').textContent=cleared;
+      document.getElementById('levelSub').textContent='Score '+score+' — keep climbing!';
+      document.getElementById('levelNext').textContent='Next Stage →';
+      lo.classList.add('show');
+    } else climbComplete();
+  }
+  function climbComplete(){
+    const dk=todayKey(), earned=Math.floor(score/COIN_RATE);
+    best=Math.max(best,score); LS.set('best',best);
+    coins = window.LL_Store ? window.LL_Store.addCoins(earned) : (coins+earned);
+    if(!window.LL_Store) LS.set('coins',coins);
+    const dayStreak=bumpStreak();
+    const climbBest=Math.max(LS.get('climb.'+dk,0),score); LS.set('climb.'+dk,climbBest);
+    const sorted=playedWords.slice().sort((a,b)=>b.length-a.length), haiku=haikuText();
+    lastResult={mode:'daily',dayKey:dk,score,best,maxStreak,longestWord:sorted[0]||'',words:sorted,wordCount:playedWords.length,coins:earned,haiku,dayStreak};
+    const ot=document.getElementById('overTitle'); if(ot) ot.textContent='Daily Climb Cleared! 🎉';
+    document.getElementById('finalScore').textContent=score;
+    document.getElementById('coinsLine').innerHTML='&#9679; +'+earned+' coins  (total '+coins+')';
+    document.getElementById('bestLine').textContent='Daily '+prettyDate(dk)+' best: '+climbBest;
+    const streakEl=document.getElementById('streakLine');
+    if(streakEl){ streakEl.textContent='🔥 '+dayStreak+'-day streak'+(dayStreak>=2?'!':''); streakEl.classList.toggle('show',dayStreak>=1); }
+    showHaiku(haiku);
+    document.getElementById('over').classList.add('show');
+    sfx('over'); if(earned>0)setTimeout(()=>sfx('coin'),320);
+    syncMode();
+  }
 
   function endGame(){
     gameOver=true;
+    { const ot=document.getElementById('overTitle'); if(ot) ot.textContent='Board Full!'; }
     const earned=Math.floor(score/COIN_RATE);
     best=Math.max(best,score); LS.set('best',best);
     coins = window.LL_Store ? window.LL_Store.addCoins(earned) : (coins+earned);
@@ -322,7 +381,7 @@
   }
   cv.addEventListener('mousedown',down);cv.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
   cv.addEventListener('touchstart',down,{passive:false});cv.addEventListener('touchmove',move,{passive:false});window.addEventListener('touchend',up);
-  document.getElementById('again').onclick=reset;
+  document.getElementById('again').onclick=()=>{ if(mode==='climb')climbStage=0; reset(); };
   document.getElementById('restart').onclick=reset;
   { const ln=document.getElementById('levelNext'); if(ln) ln.onclick=reset; }
   const helpEl=document.getElementById('help');
@@ -333,9 +392,12 @@
   const modeBtn=document.getElementById('modeBtn');
   function syncMode(){ if(!modeBtn)return;
     if(mode==='level'){ modeBtn.textContent='Levels'; return; }
+    if(mode==='climb'){ const c=currentStreak(); modeBtn.textContent='Climb'+(c>=1?'  🔥'+c:''); return; }
     const s=(mode==='daily')?currentStreak():0; modeBtn.textContent=(mode==='daily'?('Daily'+(s>=1?'  🔥'+s:'')):'Free'); }
-  const MODES=['free','daily','level'];
-  if(modeBtn) modeBtn.onclick=()=>{ mode=MODES[(MODES.indexOf(mode)+1)%MODES.length]; if(mode==='level'&&!LEVELS().length)mode='free'; LS.set('mode',mode); reset(); };
+  const MODES=['free','daily','climb','level'];
+  if(modeBtn) modeBtn.onclick=()=>{ mode=MODES[(MODES.indexOf(mode)+1)%MODES.length];
+    if(mode==='level'&&!LEVELS().length)mode='free'; if(mode==='climb'&&!window.LL_WORDPOOL)mode='level';
+    if(mode==='climb')climbStage=0; LS.set('mode',mode); reset(); };
 
   // ---- mute toggle ----
   const muteBtn=document.getElementById('muteBtn');
