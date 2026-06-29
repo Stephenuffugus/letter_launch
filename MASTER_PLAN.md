@@ -4,8 +4,42 @@ The single source of truth for what we're building and in what order. When you'r
 ready, just say **"let's get started"** and we work top-down from Phase 1.
 
 > Game: physics word game — launch letter tiles through plinko bumpers into a 7×6
-> gravity-stacked grid, drag across touching tiles (Boggle-style) to spell words,
-> build streak multipliers. Vanilla HTML/CSS/JS, no framework, no build step to run.
+> gravity-stacked grid, tap or drag across touching tiles to spell words, build streak
+> multipliers. Vanilla HTML/CSS/JS, no framework, no build step to run.
+
+---
+
+## ▶ WHEN WE RESUME — dive in here (say "let's get started")
+
+**State:** live at <https://stephenuffugus.github.io/letter_launch/> (commit `2df9014`,
+pushed). All green: `node tools/sim.js` = 7/7, standalone rebuilt, 5 headless harness
+suites pass (in the scratchpad; re-creatable). Modes: **Levels** (default), **Word Hunt**,
+**Daily Climb**, **Daily**, **Free**. Power-ups (Shuffle/Swap/Bomb), blockers, tap-to-spell
+all shipped. Economy is coins-only — sunbeams stay the Lucid Winds boss's job.
+
+**First move on resume:** take Stephen's playtest notes and triage them against the list
+below (his notes win over my ordering). Then work top-down:
+
+1. **Playtest triage** *(apply Stephen's notes)* — aiming feel, Word-Hunt UX, power-up
+   balance/costs, blocker frequency, anything that felt off on a real phone.
+2. **Filler / decoy letters in Levels** *(deferred feature — the big one)* — extra letters
+   in word-list levels for spacing/positioning. Decision to make first: are fillers pure
+   decoys (just sit there) or *required-for-spacing* (must be placed to set up a target)?
+   Then edit `tools/make-levels.js` (deal = target letters + N fillers, re-verify solvable)
+   and make traced fillers not count toward the checklist. Regenerate `docs/levels.js`.
+3. **UI/UX polish pass** *(Stephen said polish after mechanics are built)* — item-bar
+   placement/labels + "can't afford" clarity, Word-Hunt HUD (target + ＋letter button),
+   blocker look, first-run hints/onboarding, mobile spacing, menu polish.
+4. **Depth (optional, pick by appetite):**
+   - More power-ups: Wild tile, bomb-a-column, undo. Decide pay-per-use (current) vs a
+     buyable inventory in the store. Decide whether to disable power-ups in Daily/Climb (fairness).
+   - Word Hunt: scoring/penalty tuning, re-validate target after board rearrange, a
+     words-found counter + end screen, difficulty ramp.
+
+**Working rules:** after any `BUMPERS`/`REST` edit run `node tools/sim.js` (want 7/7);
+`node tools/build.js` after source edits; tunables live in the `CONFIG` block of
+`docs/game.js`; keep coins in-game only (no `Sunbeam.earn`). The scratchpad harnesses
+(`boot*.js`) are a fast headless smoke test — re-create or extend them when verifying.
 
 ---
 
@@ -193,23 +227,26 @@ Principle: never sell power that hurts the leaderboard's integrity.
 
 ## 🔧 Standing conventions (don't break these)
 
-- After editing `BUMPERS`, run `node sim.js` → must print **7/7**.
-- All tunables live in the `CONFIG` block at the top of `game.js`.
-- Rebuild the standalone with `node build.js` after source changes.
+- After editing `BUMPERS`/`REST`, run `node tools/sim.js` → must print **7/7**.
+- All tunables live in the `CONFIG` block at the top of `docs/game.js`.
+- Rebuild the standalone with `node tools/build.js` after source changes.
 - Dictionary = ENABLE list; game only uses `DICT.has(word)`.
 - New helpers attach to `window.LL_*`; load order in `index.html` matters
-  (`dict → rng → audio → share → game`).
+  (`dict → rng → audio → share → store → levels → game`).
+- Coins are **in-game only** — never add `Sunbeam.earn`/external currency unless the
+  Lucid Winds boss explicitly requests the bridge.
 
 ---
 
-## ▶️ When we resume — likely first move
+## ▶️ When we resume
 
-Hosting is live and the depth layer (store + streak + charger) is in. The biggest
-remaining levers, in rough priority:
-- **(A) Leaderboard — Phase 2.2** (the next real retention win). Seeding is done;
-  stand up a tiny Supabase table `{day_key, name, score}` and post on daily game-over.
-  *Needs your Supabase project + anon key.*
-- **(B) Haiku engine — Phase 1.1.** Integration point is live (`window.makeHaiku`);
-  paste your engine as `docs/haiku.js` and the end card + share image pick it up.
-- **(C) More store content / bumper types** — both systems are built; adding items is cheap.
-- **(D) Real-device playtest pass** — tune the charger frequency/value and `CONFIG` feel.
+**The actionable resume plan now lives at the TOP of this doc** ("▶ WHEN WE RESUME — dive
+in here"). Start there with Stephen's playtest notes.
+
+Still-parked bigger bets (not next, but on the radar):
+- **(A) Leaderboard — Phase 2.2** — tiny Supabase table `{day_key, name, score}`, post on
+  daily/climb game-over. *Needs Stephen's Supabase project + anon key.* Note: decide how
+  power-ups interact with a competitive leaderboard before this ships.
+- **(B) Haiku engine — Phase 1.1** — integration point is live (`window.makeHaiku`); drop
+  the engine in as `docs/haiku.js` and the end card + share image pick it up.
+- **(C) Sunbeam earn-bridge** — only if/when the Lucid Winds boss asks (see `LUCID_WINDS_HANDOFF.md`).
