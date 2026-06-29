@@ -21,7 +21,7 @@
   <div class="topbar">
     <div class="score"><span class="lbl">Score</span><span class="val" id="score">0</span></div>
     <div class="brand">LETTER LAUNCH</div>
-    <button class="pill" id="modeBtn" title="Toggle Daily / Free play">Free</button>
+    <button class="pill" id="modeBtn" title="Game modes — tap to switch">&#9776; Levels</button>
     <button class="pill" id="storeBtn" title="Store — spend coins on skins">&#129689; 0</button>
     <div class="spacer"></div>
     <div class="next">
@@ -58,12 +58,12 @@
     <div class="overlay" id="help">
       <h2>How to play</h2>
       <div class="helpcard">
-        <b>Drop:</b> drag in the direction you want to fire (down / down-left / down-right) anywhere on screen, then release. The tile falls through the bumpers into a column. Longer drag = more power.<br><br>
+        <b>Aim &amp; drop:</b> drag anywhere (down / down-left / down-right), then release. The <b>glowing column</b> shows exactly where the tile will land &mdash; the dotted line is the real path, so placement is all skill. Longer drag = more power.<br><br>
         <b>Spell:</b> drag across touching tiles (incl. diagonals) to trace a word (3+ letters). Valid words clear and the stack drops.<br><br>
         <b>Streak:</b> clear another word before the timer runs out to build a multiplier — x2, x3, and up.<br><br>
         <b>Charge:</b> bounce a tile off a gold &#9733; bumper and it lands charged — worth double its letter value in any word.<br><br>
-        <b>Levels:</b> tap the mode pill to reach Levels. You're dealt exactly the tiles to build the words on the checklist — clear the list to win, then climb.<br><br>
-        <b>Daily Climb:</b> a 3-stage daily puzzle, the same for everyone — clear all three to keep your &#128293; streak and share your score.
+        <b>Levels (the main mode):</b> you&rsquo;re dealt exactly the tiles to build the words on the checklist — clear the list to win, then climb. Stuck? Tap &#8635; to retry.<br><br>
+        <b>Switch modes:</b> tap the &#9776; pill (top bar) any time for the home menu &mdash; Levels, Daily Climb, Daily, or Free.
       </div>
       <button class="btn" id="helpClose">Got it</button>
     </div>
@@ -73,6 +73,45 @@
       <div class="fs" id="levelNum">1</div>
       <div class="best" id="levelSub"></div>
       <button class="btn" id="levelNext">Next Level &rarr;</button>
+    </div>
+
+    <div class="overlay menu" id="menu">
+      <div class="menuwrap">
+        <div class="menubrand">LETTER LAUNCH</div>
+        <div class="menutag">Plink the tiles &bull; trace the words &bull; clear the list</div>
+
+        <button class="modecard feature" data-mode="level">
+          <div class="mc-icon">&#127919;</div>
+          <div class="mc-main">
+            <div class="mc-title">Levels <span class="mc-badge" id="mcLevel"></span></div>
+            <div class="mc-desc">Build the words on the list from the exact tiles you&rsquo;re dealt. The signature challenge &mdash; always solvable, all about placement.</div>
+          </div>
+          <div class="mc-go">Play &#9654;</div>
+        </button>
+
+        <div class="modegrid">
+          <button class="modecard" data-mode="climb">
+            <div class="mc-icon">&#129495;</div>
+            <div class="mc-title">Daily Climb <span class="mc-badge" id="mcClimb"></span></div>
+            <div class="mc-desc">A 3&#8209;stage word&#8209;list puzzle &mdash; same for everyone, every day.</div>
+          </button>
+          <button class="modecard" data-mode="daily">
+            <div class="mc-icon">&#128197;</div>
+            <div class="mc-title">Daily <span class="mc-badge" id="mcDaily"></span></div>
+            <div class="mc-desc">One seeded endless board a day. Chase today&rsquo;s best.</div>
+          </button>
+          <button class="modecard" data-mode="free">
+            <div class="mc-icon">&#9854;</div>
+            <div class="mc-title">Free Play</div>
+            <div class="mc-desc">Endless, no list. Spell anything &mdash; pure practice.</div>
+          </button>
+        </div>
+
+        <div class="menubtns">
+          <button class="btn ghost" id="menuStore">&#129689; Store</button>
+          <button class="btn ghost" id="menuHelp">How to play</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>

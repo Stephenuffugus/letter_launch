@@ -43,16 +43,30 @@ ready, just say **"let's get started"** and we work top-down from Phase 1.
 - **Playability fixes ✅** — a full column no longer ends the game; tiles **spill to the
   nearest open column**, and it ends only when the *whole* board fills. Stuck-ball failsafe.
 
+**Word-list-forward rework (this session):**
+- **Home menu + Levels at the forefront ✅** — the old blind cycle-pill is gone. The game
+  now boots into a **home menu** (`#menu`) with mode cards: **Levels** is the featured/
+  default mode, then Daily Climb, Daily, Free. The topbar `☰` pill and a `☰` in the level
+  bar reopen it any time, in any mode → **also resolves the in-game BACK/home TODO**.
+- **Aiming is skill, not luck ✅** — removed the moving bumper (field is fully **static**),
+  restitution lowered to ≤1 (`peg .82, bouncer/charger 1.0`), so the trajectory preview is
+  an **exact** prediction. Render now draws a glowing **predicted-landing-column** highlight
+  (uses the equipped Clear-Burst colour). `sim.js` re-verified **7/7** (single static pass).
+- **Soft-lock fix ✅** — word-list modes detect "out of tiles" and surface a hint + `↻` retry
+  (also a `↻` always in the level bar).
+- **Store greatly expanded ✅** — ~**57** cosmetics across Tiles / Felt / Launcher / Aim-Trail
+  **plus a new Clear-Burst (`fx`) category**. Ownership moved to collision-safe `type:id`
+  keys (+ legacy-save migration). Coins remain **in-game-only** (no sunbeam calls).
+- **Audited ✅** — 5-dimension adversarial review (physics/state/store/UI/regression) + headless
+  boot/gameplay/regression harnesses; 6 confirmed findings fixed, standalone rebuilt.
+
 ---
 
 ## ⚠️ Top of the list when we resume
 
-- **In-game BACK button** *(flagged in playtest 2026-06-25)* — there's no way to exit /
-  return while playing (most relevant **embedded in the Lucid Winds studio** GAME tab).
-  First confirm the context: does the studio's `ext` iframe wrapper already provide a back
-  header (per its `_sg` plan), or does Letter Launch need its own back/exit control
-  (e.g. `postMessage` to the host to close the iframe, or a menu/home affordance standalone)?
-  Build the right one once that's confirmed.
+- *(cleared)* The in-game BACK/home gap is now covered by the home menu (`☰` pill + level-bar
+  `☰`, reachable in every mode). If the Lucid Winds `ext` wrapper later adds its own back
+  header, de-dupe then.
 
 ---
 

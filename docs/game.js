@@ -16,26 +16,28 @@
   const MIN_WORD=3;
   const MAX_BALL_FRAMES=360;          // failsafe: force-settle a ball stuck bouncing (~6s) so the launcher never locks
 
-  // Restitution (bounciness) by bumper kind. >1 adds energy.
-  // 'charger' uses identical physics to 'bouncer' (so reachability is unchanged);
-  // it only flags the tile gold (2x letter value). See sim.js.
-  const REST={ peg:0.86, bouncer:1.08, charger:1.08 };
+  // Restitution (bounciness) by bumper kind. Kept <=1 so the field never ADDS
+  // energy — that makes the flight deterministic and the trajectory preview an
+  // honest prediction (you can actually aim). 'charger' shares 'bouncer' physics
+  // (reachability unchanged); it only flags the tile gold (2x letter value). See sim.js.
+  const REST={ peg:0.82, bouncer:1.0, charger:1.0 };
   const PAD_MULT=2;                   // gold charged tile: letter value multiplier
 
-  /* Bumper layout.
-   *   bx,by : base position    r : radius    kind : 'peg' | 'bouncer'
-   *   move  : optional { axis:'x'|'y', amp:px, speed:rad-per-ms, phase:rad }
+  /* Bumper layout — fully STATIC (no moving bumper). A static field means the
+   * previewed path is exactly the path the ball takes, so placement is a skill,
+   * not a dice roll. All 7 columns stay reachable (verified by tools/sim.js — 7/7).
+   *   bx,by : position    r : radius    kind : 'peg' | 'bouncer' | 'charger'
    * NOTE: keep bumpers off column centers (cols are 72 wide; centers at GX0+c*72+36)
    * and leave a clear gap above BOARD_TOP so every column stays reachable.
-   * Run the included sim (see README) after changing this. */
+   * Re-run tools/sim.js (must print 7/7) after ANY change here. */
   const BUMPERS=[
-    {bx:100, by:146, r:12, kind:'peg'},
-    {bx:244, by:146, r:12, kind:'peg'},
-    {bx:388, by:146, r:12, kind:'peg'},
-    {bx:172, by:210, r:12, kind:'bouncer'},
-    {bx:316, by:210, r:12, kind:'charger'},
-    {bx:460, by:210, r:12, kind:'bouncer'},
-    {bx:280, by:110, r:13, kind:'bouncer', move:{axis:'x', amp:120, speed:0.0018, phase:0}},
+    {bx:100, by:150, r:12, kind:'peg'},
+    {bx:244, by:150, r:12, kind:'peg'},
+    {bx:388, by:150, r:12, kind:'peg'},
+    {bx:172, by:214, r:12, kind:'bouncer'},
+    {bx:316, by:214, r:12, kind:'charger'},
+    {bx:460, by:214, r:12, kind:'bouncer'},
+    {bx:280, by:108, r:13, kind:'peg'},
   ];
 
   const VALUES={a:1,b:3,c:3,d:2,e:1,f:4,g:2,h:4,i:1,j:8,k:5,l:1,m:3,n:1,o:1,p:3,q:10,r:1,s:1,t:1,u:1,v:4,w:4,x:8,y:4,z:10};
@@ -57,7 +59,9 @@
     set(k,v){try{localStorage.setItem(NS+k,JSON.stringify(v));}catch(e){}}
   };
   let best=LS.get('best',0), coins=LS.get('coins',0);
-  let mode=LS.get('mode','free');                 // 'free' | 'daily'
+  // 'level' (word-list campaign) is the headline mode and the default. Other modes:
+  // 'climb' (daily 3-stage word list), 'daily' (seeded endless), 'free' (endless practice).
+  let mode=LS.get('mode','level');
   const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const todayKey=()=>window.LL_RNG?window.LL_RNG.dayKey():'';
   const prettyDate=key=>{if(!key)return'';const p=key.split('-');return MONTHS[(+p[1])-1]+' '+(+p[2]);};
@@ -80,7 +84,7 @@
   const sfx=(name,...a)=>{if(window.LL_Audio)window.LL_Audio.play(name,...a);};
 
   // ---- cosmetics (from window.LL_Store; falls back to the classic look) ----
-  const DEFAULT_SKIN={tile:{hi:'#fffaf0',lo:'#f0e2c5',edge:'#cdb488',ink:'#2c2417'},felt:{board:'#1d3b34'},launcher:{wood:'#7c5024',woodD:'#5a3917',accent:'#eaa53b'},trail:{color:'#ffffff'}};
+  const DEFAULT_SKIN={tile:{hi:'#fffaf0',lo:'#f0e2c5',edge:'#cdb488',ink:'#2c2417'},felt:{board:'#1d3b34'},launcher:{wood:'#7c5024',woodD:'#5a3917',accent:'#eaa53b'},trail:{color:'#ffffff'},fx:{color:'#5bc47e'}};
   const skin=()=>window.LL_Store?window.LL_Store.getStyle():DEFAULT_SKIN;
   const hexA=(hex,a)=>{hex=String(hex).replace('#','');if(hex.length===3)hex=hex.split('').map(x=>x+x).join('');const n=parseInt(hex,16);return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';};
 
@@ -97,8 +101,9 @@
   // ---- state ----
   let grid, queue, current, score, gameOver;
   let ball=null, drop=null, particles=[], floaters=[];
-  let aiming=false, aim={sx:0,sy:0,cx:0,cy:0};
+  let aiming=false, aim={sx:0,sy:0,cx:0,cy:0}, aimCol=-1;   // aimCol: previewed landing column
   let tracing=false, chain=[]; let shake=0;
+  let paused=true;                  // true while the home menu / pause is up (input frozen, boot state)
   let streak=0, comboUntil=0, maxStreak=0;
   let playedWords=[];               // every valid word cleared (for the haiku card)
   let lastResult=null;              // snapshot for the share card (built on game over)
@@ -143,12 +148,14 @@
   }
   const nextLetter=()=> (mode==='level'||mode==='climb') ? (dealIdx<deal.length?deal[dealIdx++]:'') : randLetter();
   function reset(){
+    paused=false;                   // every reset yields a playable board (boot re-pauses via openMenu)
     setupRng();                     // (re)seed the letter stream for the current mode
     if(mode==='level') loadLevel(); else if(mode==='climb') loadClimb();
     newGrid(); score=0; gameOver=false; ball=null; drop=null; particles=[]; floaters=[]; chain=[]; tracing=false; aiming=false; streak=0; comboUntil=0; maxStreak=0; playedWords=[]; lastResult=null; launched=0;
     queue=[nextLetter(),nextLetter(),nextLetter()]; current=nextLetter();
     document.getElementById('over').classList.remove('show');
     const lo=document.getElementById('levelover'); if(lo) lo.classList.remove('show');
+    const mn=document.getElementById('menu'); if(mn) mn.classList.remove('show');   // reset == a clean, playable board
     msg(mode==='climb'?('Daily Climb — stage '+(climbStage+1)+' of 3'):(mode==='level'?('Level '+level+' — build the words on the list!'):(mode==='daily'?('Daily '+prettyDate(todayKey())+' — drag to aim.'):'Drag down to aim, release to drop.')));
     updateHUD(); syncMode(); renderLevelBar();
   }
@@ -166,11 +173,9 @@
   }
 
   // ---- bumpers ----
-  function updateBumpers(now){
-    for(const b of BUMPERS){
-      if(b.move){const o=Math.sin(now*b.move.speed+(b.move.phase||0))*b.move.amp;
-        b.x=b.bx+(b.move.axis==='x'?o:0); b.y=b.by+(b.move.axis==='y'?o:0);}
-      else {b.x=b.bx; b.y=b.by;}
+  function updateBumpers(){
+    for(const b of BUMPERS){           // static field: position is just the base
+      b.x=b.bx; b.y=b.by;
       if(b.flash>0) b.flash-=0.08;
     }
   }
@@ -218,9 +223,9 @@
     let base=0;for(const p of chain){const cl=grid[p.r][p.c];base+=(VALUES[cl.l.toLowerCase()]||1)*(cl.bonus?PAD_MULT:1);}
     const gained=base*w.length*streak; score+=gained;
     playedWords.push(w.toLowerCase());
-    let cx=0,cy=0;
-    for(const p of chain){cx+=cellX(p.c);cy+=cellY(p.r);ping(cellX(p.c),cellY(p.r),'#5bc47e',10);grid[p.r][p.c]=null;}
-    floaters.push({x:cx/chain.length,y:cy/chain.length,txt:'+'+gained+(streak>1?'  x'+streak:''),life:1});
+    let cx=0,cy=0; const fxc=skin().fx?skin().fx.color:'#5bc47e';
+    for(const p of chain){cx+=cellX(p.c);cy+=cellY(p.r);ping(cellX(p.c),cellY(p.r),fxc,10);grid[p.r][p.c]=null;}
+    floaters.push({x:cx/chain.length,y:cy/chain.length,txt:'+'+gained+(streak>1?'  x'+streak:''),life:1,col:fxc});
     collapse();chip(w,'good');
     sfx('word',w.length,streak); if(streak>=2)sfx('streakUp',streak);
     return gained;
@@ -264,10 +269,19 @@
     const was=bar.classList.contains('show');
     if(mode!=='level'&&mode!=='climb'){ if(was){ bar.classList.remove('show'); bar.innerHTML=''; fit(); } return; }
     const left=Math.max(0,deal.length-launched);
+    const allDone=targets.length>0 && targets.every(x=>x.done);
+    const noTiles=!current && queue.every(q=>!q);     // nothing left to launch
+    const stuck=noTiles && !allDone;
     const lbl=mode==='climb'?('Climb '+(climbStage+1)+'/3'):('Lv '+level);
     const chips=targets.map(t=>'<span class="lchip'+(t.done?' done':'')+'">'+t.w+'</span>').join('');
-    bar.innerHTML='<span class="lvl">'+lbl+'</span>'+chips+'<span class="ltiles" title="tiles left">'+left+'●</span>';
+    bar.innerHTML='<button class="lmenu" id="lvlMenu" title="Game modes">&#9776;</button>'+
+      '<span class="lvl">'+lbl+'</span>'+chips+
+      '<span class="ltiles'+(stuck?' out':'')+'" title="tiles left">'+left+'●</span>'+
+      '<button class="lretry'+(stuck?' urge':'')+'" id="lvlRetry" title="Retry this '+(mode==='climb'?'stage':'level')+'">&#8635;</button>';
     bar.classList.add('show');
+    const rb=document.getElementById('lvlRetry'); if(rb) rb.onclick=()=>reset();
+    const mb=document.getElementById('lvlMenu'); if(mb) mb.onclick=openMenu;
+    if(stuck) msg('Out of tiles — trace a word on the board, or tap &#8635; to retry.');
     if(!was) fit();   // bar appeared → the stage got shorter, refit the canvas
   }
   function levelComplete(){
@@ -361,13 +375,13 @@
   function cellAt(p){if(p.x<GX0||p.x>GX0+GRID_W||p.y<BOARD_TOP)return null;const c=Math.floor((p.x-GX0)/CELL),r=Math.floor((p.y-BOARD_TOP)/CELL);if(r<0||r>=ROWS||c<0||c>=COLS||!grid[r][c])return null;return{r,c};}
   function down(e){
     if(window.LL_Audio)window.LL_Audio.resume();   // unlock audio on first gesture
-    if(gameOver)return;e.preventDefault();const p=pos(e);
+    if(gameOver||paused)return;e.preventDefault();const p=pos(e);
     const cell=cellAt(p);
     if(cell){tracing=true;chain=[cell];liveChip();return;}
     if(!ball&&!drop&&current){aiming=true;aim={sx:p.x,sy:p.y,cx:p.x,cy:p.y};}
   }
   function move(e){
-    if(gameOver)return;const p=pos(e);
+    if(gameOver||paused)return;const p=pos(e);
     if(aiming){e.preventDefault();aim.cx=p.x;aim.cy=p.y;}
     else if(tracing){e.preventDefault();const cell=cellAt(p);if(cell){
       if(chain.length>=2){const prev=chain[chain.length-2];if(cell.r===prev.r&&cell.c===prev.c){chain.pop();liveChip();return;}}
@@ -375,7 +389,7 @@
     }}
   }
   function up(){
-    if(gameOver)return;
+    if(gameOver||paused)return;
     if(aiming){aiming=false;const v=dragVec();if(v.d>14)launch(v.x*POWER,v.y*POWER);}
     else if(tracing){tracing=false;submitWord();}
   }
@@ -388,16 +402,40 @@
   document.getElementById('helpBtn').onclick=()=>helpEl.classList.add('show');
   document.getElementById('helpClose').onclick=()=>helpEl.classList.remove('show');
 
-  // ---- mode toggle (Daily / Free) ----
+  // ---- game-mode menu (home screen + always-available switcher) ----
   const modeBtn=document.getElementById('modeBtn');
+  const menuEl=document.getElementById('menu');
+  const MODE_NAME={level:'Levels',climb:'Climb',daily:'Daily',free:'Free'};
   function syncMode(){ if(!modeBtn)return;
-    if(mode==='level'){ modeBtn.textContent='Levels'; return; }
-    if(mode==='climb'){ const c=currentStreak(); modeBtn.textContent='Climb'+(c>=1?'  🔥'+c:''); return; }
-    const s=(mode==='daily')?currentStreak():0; modeBtn.textContent=(mode==='daily'?('Daily'+(s>=1?'  🔥'+s:'')):'Free'); }
-  const MODES=['free','daily','climb','level'];
-  if(modeBtn) modeBtn.onclick=()=>{ mode=MODES[(MODES.indexOf(mode)+1)%MODES.length];
-    if(mode==='level'&&!LEVELS().length)mode='free'; if(mode==='climb'&&!window.LL_WORDPOOL)mode='level';
-    if(mode==='climb')climbStage=0; LS.set('mode',mode); reset(); };
+    let s=''; if(mode==='daily'||mode==='climb'){ const c=currentStreak(); if(c>=1)s='  🔥'+c; }
+    modeBtn.innerHTML='&#9776; '+(MODE_NAME[mode]||'Play')+s; }
+  function modeAvailable(m){ if(m==='level')return !!LEVELS().length; if(m==='climb')return !!window.LL_WORDPOOL; return true; }
+  function openMenu(){
+    paused=true; aiming=false; tracing=false;
+    // the menu lives inside #stage, so it can't cover the result overlays or the
+    // (sibling) level bar — dismiss them so the menu is the only thing showing.
+    document.getElementById('over').classList.remove('show');
+    const lo=document.getElementById('levelover'); if(lo) lo.classList.remove('show');
+    const lb=document.getElementById('levelbar'); if(lb && lb.classList.contains('show')){ lb.classList.remove('show'); fit(); }
+    const lv=document.getElementById('mcLevel'); if(lv) lv.textContent='Level '+level;
+    const cs=currentStreak(), fire=cs>=1?('🔥'+cs):'';
+    const mc=document.getElementById('mcClimb'); if(mc) mc.textContent=fire;
+    const md=document.getElementById('mcDaily'); if(md) md.textContent=fire;
+    if(menuEl) menuEl.classList.add('show');
+  }
+  function closeMenu(){ if(menuEl) menuEl.classList.remove('show'); paused=false; }
+  function startMode(m){
+    if(!modeAvailable(m)) m='free';
+    mode=m; LS.set('mode',mode);
+    if(mode==='climb') climbStage=0;
+    closeMenu(); reset();
+  }
+  if(modeBtn) modeBtn.onclick=openMenu;
+  if(menuEl){
+    [].forEach.call(menuEl.querySelectorAll('.modecard'),c=>{ c.onclick=()=>startMode(c.getAttribute('data-mode')); });
+    const ms=document.getElementById('menuStore'); if(ms) ms.onclick=()=>{ if(window.LL_Store) window.LL_Store.open(); };
+    const mh=document.getElementById('menuHelp'); if(mh) mh.onclick=()=>document.getElementById('help').classList.add('show');
+  }
 
   // ---- mute toggle ----
   const muteBtn=document.getElementById('muteBtn');
@@ -423,17 +461,27 @@
     shareBtn.disabled=false;
   };
 
-  // ---- trajectory preview (uses current bumper positions) ----
+  // ---- trajectory preview ----
+  // Because the field is static, this is an EXACT prediction of the ball's path.
+  // Returns the sampled points AND the column the tile will actually settle in
+  // (accounting for spill to the nearest open column when the aimed one is full),
+  // so the player can aim by sight.
   function previewPts(){
     const v=dragVec();const pts=[];let x=ANCHOR.x,y=ANCHOR.y,vx=v.x*POWER,vy=v.y*POWER;
-    for(let i=0;i<120;i++){
+    let col=-1;
+    // simulate the SAME horizon the real ball gets (incl. the failsafe force-settle),
+    // so the predicted column never blinks out for long, bouncy aims.
+    for(let i=0;i<MAX_BALL_FRAMES;i++){
       vy+=GRAV;x+=vx;y+=vy;
       if(x<BALL_R){x=BALL_R;vx*=-0.7;}if(x>W-BALL_R){x=W-BALL_R;vx*=-0.7;}if(y<BALL_R){y=BALL_R;vy*=-0.5;}
       for(const b of BUMPERS){const dx=x-b.x,dy=y-b.y,dd=Math.hypot(dx,dy),mn=BALL_R+b.r;if(dd<mn){const nx=dx/(dd||1),ny=dy/(dd||1);x=b.x+nx*mn;y=b.y+ny*mn;const dot=vx*nx+vy*ny,k=REST[b.kind]||0.86;vx=(vx-2*dot*nx)*k;vy=(vy-2*dot*ny)*k;}}
-      if(vy>0&&y+BALL_R>=BOARD_TOP)break;
-      if(i%2===0)pts.push({x,y});
+      if(i%2===0 && pts.length<120) pts.push({x,y});   // keep the visible trail tidy
+      if(vy>0&&y+BALL_R>=BOARD_TOP){ col=Math.floor((x-GX0)/CELL); break; }
     }
-    return pts;
+    if(col<0) col=Math.floor((x-GX0)/CELL);             // failsafe: settle at current x (mirrors settleBall)
+    col=Math.max(0,Math.min(COLS-1,col));
+    if(lowestEmpty(col)<0) col=nearestOpenCol(col);     // spill to nearest open column
+    return {pts,col};
   }
 
   // ---- render ----
@@ -474,16 +522,25 @@
       g.addColorStop(0, lift>0?'#bff0e2':'#3a7d6d');g.addColorStop(1,'#1c5448');
       ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,b.r,0,7);ctx.fill();
     }
-    if(b.move){ctx.strokeStyle='rgba(255,255,255,.18)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,b.r+4,0,7);ctx.stroke();}
     ctx.restore();
   }
   function render(){
     let sx=0,sy=0;if(shake>0){sx=(Math.random()-.5)*shake;sy=(Math.random()-.5)*shake;}
+    const prev=(aiming && dragVec().d>14)?previewPts():null;   // exact, once per frame
+    aimCol=prev?prev.col:-1;
     ctx.save();ctx.translate(sx,sy);ctx.clearRect(-20,-20,W+40,H+40);
     ctx.fillStyle=skin().felt.board;roundRect(0,0,W,H,16);ctx.fill();
 
     ctx.fillStyle='rgba(0,0,0,.18)';roundRect(GX0-4,BOARD_TOP-6,GRID_W+8,ROWS*CELL+12,16);ctx.fill();
     for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){ctx.fillStyle='rgba(0,0,0,.16)';roundRect(GX0+c*CELL+6,BOARD_TOP+r*CELL+6,CELL-12,CELL-12,9);ctx.fill();}
+    // predicted-landing column highlight: a glowing drop zone so aiming is by sight
+    if(aimCol>=0){
+      const hx=GX0+aimCol*CELL, fxc=skin().fx?skin().fx.color:'#5bc47e';
+      const tr=lowestEmpty(aimCol); const ty=tr>=0?cellY(tr)-CELL/2:BOARD_TOP;
+      ctx.fillStyle=hexA(fxc,0.14);roundRect(hx+3,BOARD_TOP-2,CELL-6,ROWS*CELL+4,10);ctx.fill();
+      ctx.fillStyle=hexA(fxc,0.22);roundRect(hx+3,ty+2,CELL-6,Math.max(0,cellY(ROWS-1)+CELL/2-ty-2),10);ctx.fill();
+      ctx.strokeStyle=hexA(fxc,0.55);ctx.lineWidth=2;roundRect(hx+3,BOARD_TOP-2,CELL-6,ROWS*CELL+4,10);ctx.stroke();
+    }
     ctx.strokeStyle='rgba(255,255,255,.05)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(14,BOARD_TOP);ctx.lineTo(W-14,BOARD_TOP);ctx.stroke();
 
     for(const b of BUMPERS) drawBumper(b);
@@ -493,7 +550,7 @@
 
     drawLauncher();
 
-    if(aiming){const pts=previewPts();ctx.fillStyle=skin().trail.color;pts.forEach((p,i)=>{ctx.globalAlpha=0.8-i/pts.length*0.6;ctx.beginPath();ctx.arc(p.x,p.y,3.2,0,7);ctx.fill();});ctx.globalAlpha=1;}
+    if(prev){const pts=prev.pts;ctx.fillStyle=skin().trail.color;pts.forEach((p,i)=>{ctx.globalAlpha=0.85-i/pts.length*0.6;ctx.beginPath();ctx.arc(p.x,p.y,3.2,0,7);ctx.fill();});ctx.globalAlpha=1;}
 
     if(drop)drawTile(cellX(drop.c),drop.y,drop.letter,CELL-14,false,0,drop.bonus);
     if(ball){ctx.save();ctx.translate(ball.x,ball.y);ctx.rotate(ball.rot);drawTile(0,0,ball.letter,BALL_R*2,false,0,ball.bonus);ctx.restore();}
@@ -508,7 +565,7 @@
     }
 
     particles.forEach(p=>{ctx.globalAlpha=p.life;ctx.fillStyle=p.col;ctx.beginPath();ctx.arc(p.x,p.y,3,0,7);ctx.fill();});ctx.globalAlpha=1;
-    floaters.forEach(f=>{ctx.globalAlpha=Math.min(1,f.life*1.4);ctx.fillStyle='#5bc47e';ctx.font='900 24px Fraunces,serif';ctx.textAlign='center';ctx.fillText(f.txt,f.x,f.y);});ctx.globalAlpha=1;
+    floaters.forEach(f=>{ctx.globalAlpha=Math.min(1,f.life*1.4);ctx.fillStyle=f.col||'#5bc47e';ctx.font='900 24px Fraunces,serif';ctx.textAlign='center';ctx.fillText(f.txt,f.x,f.y);});ctx.globalAlpha=1;
     ctx.restore();
   }
   function drawLauncher(){
@@ -522,6 +579,6 @@
   }
 
   // ---- loop ----
-  function loop(){updateBumpers(performance.now());step();stepDrop();stepFx();render();requestAnimationFrame(loop);}
-  reset(); updateBumpers(performance.now()); fit(); loop();
+  function loop(){updateBumpers();if(!paused){step();stepDrop();}stepFx();render();requestAnimationFrame(loop);}
+  reset(); openMenu(); updateBumpers(); fit(); loop();
 })();
