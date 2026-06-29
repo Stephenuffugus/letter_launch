@@ -12,7 +12,6 @@ const BUMPERS=[
   {bx:172,by:214,r:12,kind:'bouncer'},
   {bx:316,by:214,r:12,kind:'charger'},
   {bx:460,by:214,r:12,kind:'bouncer'},
-  {bx:280,by:108,r:13,kind:'peg'},
 ];
 function place(){return BUMPERS.map(b=>({x:b.bx,y:b.by,r:b.r,kind:b.kind}));}
 function landCol(dx,dy,B){

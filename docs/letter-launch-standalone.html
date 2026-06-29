@@ -53,15 +53,36 @@ body{
 canvas{display:block; touch-action:none; border-radius:16px;
   box-shadow:0 14px 40px rgba(0,0,0,.45), inset 0 0 0 2px rgba(0,0,0,.25); cursor:crosshair}
 
-.word{position:absolute; left:0; right:0; top:14px; display:flex; justify-content:center; pointer-events:none;}
+.word{position:absolute; left:0; right:0; top:14px; display:flex; gap:8px; align-items:center; justify-content:center; pointer-events:none;}
 .word .chip{font-family:"Fraunces",serif;font-weight:900;font-size:22px;letter-spacing:3px;
   padding:6px 16px;border-radius:30px;background:rgba(0,0,0,.5);border:1.5px solid rgba(255,255,255,.18);transition:.12s;}
+/* tap-to-spell submit / clear buttons (shown only while a word is being built) */
+.wbtn{display:none; place-items:center; pointer-events:auto; width:40px; height:40px; border-radius:50%;
+  font-size:19px; font-weight:800; cursor:pointer; color:#f3ead8; background:rgba(0,0,0,.5);
+  border:1.5px solid rgba(255,255,255,.2); box-shadow:0 2px 6px rgba(0,0,0,.35); transition:.12s;}
+.wbtn:active{transform:scale(.9)}
+.wbtn.clear{color:#ffb4ae; border-color:rgba(224,98,92,.55); background:rgba(224,98,92,.2)}
+.wbtn.submit{color:#bff5d0; border-color:rgba(91,196,126,.45); background:rgba(91,196,126,.16); opacity:.5}
+.wbtn.submit.ready{opacity:1; color:#06210f; background:rgba(91,196,126,.95); border-color:#bff5d0; box-shadow:0 0 16px rgba(91,196,126,.55)}
 .word .chip.good{background:rgba(91,196,126,.92);color:#06210f;border-color:#bff5d0}
 .word .chip.bad{background:rgba(224,98,92,.9);color:#2a0606;border-color:#ffd0cd}
 
-.toast{position:absolute; left:0; right:0; bottom:14px; text-align:center; pointer-events:none;
+.toast{position:absolute; left:0; right:0; bottom:62px; text-align:center; pointer-events:none;
   font-size:12.5px; opacity:0; transition:opacity .3s;}
-.toast.show{opacity:.8}
+.toast.show{opacity:.85}
+
+/* ---- power-up item bar ---- */
+.itembar{position:absolute; left:0; right:0; bottom:10px; display:none; gap:10px; justify-content:center; pointer-events:none;}
+.itembar.show{display:flex}
+.item{pointer-events:auto; position:relative; min-width:52px; height:44px; padding:0 12px; border-radius:13px; cursor:pointer;
+  font-size:20px; line-height:1; color:#f3ead8; background:rgba(0,0,0,.55); border:1.5px solid rgba(255,255,255,.16);
+  box-shadow:0 3px 8px rgba(0,0,0,.4); opacity:.55; transition:.12s; display:grid; place-items:center;}
+.item.afford{opacity:1}
+.item.armed{border-color:#7af2c4; background:rgba(122,242,196,.2); box-shadow:0 0 14px rgba(122,242,196,.5)}
+.item:active{transform:scale(.92)}
+.item .ic{position:absolute; bottom:-7px; right:-4px; font-size:10px; font-weight:800; color:#3a2606;
+  background:linear-gradient(180deg,var(--amber),var(--amber-d)); border-radius:8px; padding:1px 5px; box-shadow:0 1px 3px rgba(0,0,0,.4);}
+.item.nope{animation:nope .25s}   /* reuses the @keyframes nope defined in the store section */
 
 .overlay{position:absolute; inset:0; background:rgba(10,22,19,.9); backdrop-filter:blur(5px);
   display:none; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; padding:24px;}
@@ -184,8 +205,18 @@ canvas{display:block; touch-action:none; border-radius:16px;
 
   <div class="stage" id="stage">
     <canvas id="cv"></canvas>
-    <div class="word"><span class="chip" id="chip" style="display:none"></span></div>
+    <div class="word">
+      <button class="wbtn clear" id="wClear" title="Clear selection">&#10005;</button>
+      <span class="chip" id="chip" style="display:none"></span>
+      <button class="wbtn submit" id="wSubmit" title="Submit word">&#10003;</button>
+    </div>
     <div class="toast" id="toast"></div>
+
+    <div class="itembar" id="itembar">
+      <button class="item" id="itShuffle" title="Shuffle the board's letters">🔀<span class="ic">40</span></button>
+      <button class="item" id="itSwap" title="Swap two tiles">🔁<span class="ic">30</span></button>
+      <button class="item" id="itBomb" title="Bomb a tile">💣<span class="ic">50</span></button>
+    </div>
 
     <div class="overlay" id="over">
       <h2 id="overTitle">Board Full!</h2>
@@ -205,11 +236,13 @@ canvas{display:block; touch-action:none; border-radius:16px;
       <h2>How to play</h2>
       <div class="helpcard">
         <b>Aim &amp; drop:</b> drag anywhere (down / down-left / down-right), then release. The <b>glowing column</b> shows exactly where the tile will land &mdash; the dotted line is the real path, so placement is all skill. Longer drag = more power.<br><br>
-        <b>Spell:</b> drag across touching tiles (incl. diagonals) to trace a word (3+ letters). Valid words clear and the stack drops.<br><br>
+        <b>Spell two ways:</b> <b>trace</b> across touching tiles (incl. diagonals), <i>or</i> <b>tap tiles one at a time</b> and press <b>&#10003;</b> to submit. Tap a picked tile to unpick it; <b>&#10005;</b> clears. Words are 3+ letters; valid words clear and the stack drops.<br><br>
         <b>Streak:</b> clear another word before the timer runs out to build a multiplier — x2, x3, and up.<br><br>
         <b>Charge:</b> bounce a tile off a gold &#9733; bumper and it lands charged — worth double its letter value in any word.<br><br>
         <b>Levels (the main mode):</b> you&rsquo;re dealt exactly the tiles to build the words on the checklist — clear the list to win, then climb. Stuck? Tap &#8635; to retry.<br><br>
-        <b>Switch modes:</b> tap the &#9776; pill (top bar) any time for the home menu &mdash; Levels, Daily Climb, Daily, or Free.
+        <b>Power-ups</b> (cost coins): &#128256; shuffle the board&rsquo;s letters, &#128257; swap two tiles, &#128163; bomb a tile. Buttons sit at the bottom while you play.<br><br>
+        <b>Word Hunt:</b> launch letters to fill the board, then spell the word it can make. Stuck? Take a letter &mdash; but each extra one drops a black block. Clear a word next to a block to break it.<br><br>
+        <b>Switch modes:</b> tap the &#9776; pill (top bar) any time for the home menu &mdash; Levels, Word Hunt, Daily Climb, Daily, or Free.
       </div>
       <button class="btn" id="helpClose">Got it</button>
     </div>
@@ -240,6 +273,11 @@ canvas{display:block; touch-action:none; border-radius:16px;
             <div class="mc-icon">&#129495;</div>
             <div class="mc-title">Daily Climb <span class="mc-badge" id="mcClimb"></span></div>
             <div class="mc-desc">A 3&#8209;stage word&#8209;list puzzle &mdash; same for everyone, every day.</div>
+          </button>
+          <button class="modecard" data-mode="hunt">
+            <div class="mc-icon">&#128269;</div>
+            <div class="mc-title">Word Hunt</div>
+            <div class="mc-desc">Launch letters, then spell the word they can make. Stuck? Take a letter &mdash; but blocks pile up.</div>
           </button>
           <button class="modecard" data-mode="daily">
             <div class="mc-icon">&#128197;</div>
@@ -804,6 +842,8 @@ window.LL_LEVELS=[
    * NOTE: keep bumpers off column centers (cols are 72 wide; centers at GX0+c*72+36)
    * and leave a clear gap above BOARD_TOP so every column stays reachable.
    * Re-run tools/sim.js (must print 7/7) after ANY change here. */
+  // NB: no bumper sits on the launcher's center line (x=280) — a straight-down shot
+  // must fall straight, so aiming feels honest. Gaps between pegs keep all 7 cols reachable.
   const BUMPERS=[
     {bx:100, by:150, r:12, kind:'peg'},
     {bx:244, by:150, r:12, kind:'peg'},
@@ -811,7 +851,6 @@ window.LL_LEVELS=[
     {bx:172, by:214, r:12, kind:'bouncer'},
     {bx:316, by:214, r:12, kind:'charger'},
     {bx:460, by:214, r:12, kind:'bouncer'},
-    {bx:280, by:108, r:13, kind:'peg'},
   ];
 
   const VALUES={a:1,b:3,c:3,d:2,e:1,f:4,g:2,h:4,i:1,j:8,k:5,l:1,m:3,n:1,o:1,p:3,q:10,r:1,s:1,t:1,u:1,v:4,w:4,x:8,y:4,z:10};
@@ -877,6 +916,8 @@ window.LL_LEVELS=[
   let ball=null, drop=null, particles=[], floaters=[];
   let aiming=false, aim={sx:0,sy:0,cx:0,cy:0}, aimCol=-1;   // aimCol: previewed landing column
   let tracing=false, chain=[]; let shake=0;
+  let dragMoved=false, gestureStart=null;   // tap-vs-drag: a gesture is a drag once it crosses into another tile
+  let tool=null, swapFirst=null;            // active power-up tool ('swap'|'bomb') + its first picked cell
   let paused=true;                  // true while the home menu / pause is up (input frozen, boot state)
   let streak=0, comboUntil=0, maxStreak=0;
   let playedWords=[];               // every valid word cleared (for the haiku card)
@@ -885,6 +926,10 @@ window.LL_LEVELS=[
   let level=LS.get('level',1);      // current campaign level number (1-based)
   let levelData=null, deal=[], dealIdx=0, launched=0, targets=[];
   let climbStage=0;                 // daily ascension: current stage (0..2)
+  // Word Hunt mode: stock the board with letters, then spell a word it can make.
+  let huntTarget=null, huntDone=new Set(), huntHelps=0, huntStock=0;
+  const HUNT_STOCK=8;               // tiles to launch before the first target appears
+  const ITEMS={shuffle:{cost:40}, swap:{cost:30}, bomb:{cost:50}};   // power-up coin costs (in-game only)
 
   const cellX=c=>GX0+c*CELL+CELL/2, cellY=r=>BOARD_TOP+r*CELL+CELL/2;
   function newGrid(){grid=[];for(let r=0;r<ROWS;r++)grid.push(new Array(COLS).fill(null));}
@@ -923,15 +968,17 @@ window.LL_LEVELS=[
   const nextLetter=()=> (mode==='level'||mode==='climb') ? (dealIdx<deal.length?deal[dealIdx++]:'') : randLetter();
   function reset(){
     paused=false;                   // every reset yields a playable board (boot re-pauses via openMenu)
+    tool=null; swapFirst=null;
+    if(mode==='hunt'){ huntTarget=null; huntDone=new Set(); huntHelps=0; huntStock=0; }
     setupRng();                     // (re)seed the letter stream for the current mode
     if(mode==='level') loadLevel(); else if(mode==='climb') loadClimb();
-    newGrid(); score=0; gameOver=false; ball=null; drop=null; particles=[]; floaters=[]; chain=[]; tracing=false; aiming=false; streak=0; comboUntil=0; maxStreak=0; playedWords=[]; lastResult=null; launched=0;
+    newGrid(); score=0; gameOver=false; ball=null; drop=null; particles=[]; floaters=[]; chain=[]; tracing=false; dragMoved=false; aiming=false; streak=0; comboUntil=0; maxStreak=0; playedWords=[]; lastResult=null; launched=0;
     queue=[nextLetter(),nextLetter(),nextLetter()]; current=nextLetter();
     document.getElementById('over').classList.remove('show');
     const lo=document.getElementById('levelover'); if(lo) lo.classList.remove('show');
     const mn=document.getElementById('menu'); if(mn) mn.classList.remove('show');   // reset == a clean, playable board
-    msg(mode==='climb'?('Daily Climb — stage '+(climbStage+1)+' of 3'):(mode==='level'?('Level '+level+' — build the words on the list!'):(mode==='daily'?('Daily '+prettyDate(todayKey())+' — drag to aim.'):'Drag down to aim, release to drop.')));
-    updateHUD(); syncMode(); renderLevelBar();
+    msg(mode==='climb'?('Daily Climb — stage '+(climbStage+1)+' of 3'):(mode==='level'?('Level '+level+' — build the words on the list!'):(mode==='hunt'?('Word Hunt — launch '+HUNT_STOCK+' letters, then spell what they make!'):(mode==='daily'?('Daily '+prettyDate(todayKey())+' — drag to aim.'):'Drag down to aim, release to drop.'))));
+    updateHUD(); syncMode(); renderLevelBar(); hideChip(); updateItemBar();
   }
   function lowestEmpty(c){for(let r=ROWS-1;r>=0;r--) if(!grid[r][c]) return r; return -1;}
   function nearestOpenCol(c){for(let d=1;d<COLS;d++){if(c-d>=0&&lowestEmpty(c-d)>=0)return c-d;if(c+d<COLS&&lowestEmpty(c+d)>=0)return c+d;}return -1;}
@@ -955,7 +1002,13 @@ window.LL_LEVELS=[
   }
 
   // ---- aim / fire ----
-  function dragVec(){let dx=aim.cx-aim.sx,dy=aim.cy-aim.sy,d=Math.hypot(dx,dy);
+  // Stable aim point: per-axis median of the last few drag samples (rejects a lift-off
+  // jerk). The PREVIEW and the actual launch both use this, so the glowing column never lies.
+  function aimPoint(){const path=aim.path||[];
+    if(path.length>=3){const xs=path.slice(-3).map(q=>q.x).sort((a,b)=>a-b),ys=path.slice(-3).map(q=>q.y).sort((a,b)=>a-b);return{x:xs[1],y:ys[1]};}
+    if(path.length>=1)return path[path.length-1];
+    return{x:aim.cx,y:aim.cy};}
+  function dragVec(){const t=aimPoint();let dx=t.x-aim.sx,dy=t.y-aim.sy,d=Math.hypot(dx,dy);
     if(d>MAX_PULL){dx*=MAX_PULL/d;dy*=MAX_PULL/d;}return{x:dx,y:dy,d:Math.min(d,MAX_PULL)};}
   function launch(vx,vy){ball={x:ANCHOR.x,y:ANCHOR.y,vx,vy,r:BALL_R,letter:current,rot:0,bonus:false,age:0};}
 
@@ -983,7 +1036,8 @@ window.LL_LEVELS=[
     if(!drop)return;
     drop.vy+=GRAV*1.5; drop.y+=drop.vy; const ty=cellY(drop.r);
     if(drop.y>=ty){grid[drop.r][drop.c]={l:drop.letter,pop:1,bonus:!!drop.bonus};ping(cellX(drop.c),ty,drop.bonus?'#ffcf4d':'#eaa53b',drop.bonus?9:6);sfx('lock');drop=null;
-      launched++; current=queue.shift();queue.push(nextLetter());updateHUD();renderLevelBar();}
+      launched++; if(mode==='hunt'){huntStock++;maybePickHuntTarget();}
+      current=queue.shift();queue.push(nextLetter());updateHUD();renderLevelBar();}
   }
 
   // ---- words + streak ----
@@ -1000,6 +1054,7 @@ window.LL_LEVELS=[
     let cx=0,cy=0; const fxc=skin().fx?skin().fx.color:'#5bc47e';
     for(const p of chain){cx+=cellX(p.c);cy+=cellY(p.r);ping(cellX(p.c),cellY(p.r),fxc,10);grid[p.r][p.c]=null;}
     floaters.push({x:cx/chain.length,y:cy/chain.length,txt:'+'+gained+(streak>1?'  x'+streak:''),life:1,col:fxc});
+    clearAdjacentBlockers();        // a word next to a black block breaks it
     collapse();chip(w,'good');
     sfx('word',w.length,streak); if(streak>=2)sfx('streakUp',streak);
     return gained;
@@ -1013,13 +1068,126 @@ window.LL_LEVELS=[
           if(targets.every(x=>x.done)) setTimeout(mode==='climb'?climbAdvance:levelComplete,450); }
         else if(DICT.has(lw)){ chip(w,'bad'); sfx('bad'); msg('&ldquo;'+w.toUpperCase()+'&rdquo; \u2014 not on the list.'); }
         else { chip(w,'bad'); shake=10; sfx('bad'); msg('Not a word.'); }
-      } else if(DICT.has(lw)){ const g=scoreAndClear(w); msg(w.toUpperCase()+' &rarr; +'+g+(streak>1?' (x'+streak+' streak!)':'')); }
+      } else if(mode==='hunt'){ huntSubmit(w,lw); }
+      else if(DICT.has(lw)){ const g=scoreAndClear(w); msg(w.toUpperCase()+' &rarr; +'+g+(streak>1?' (x'+streak+' streak!)':'')); }
       else { chip(w,'bad'); shake=10; sfx('bad'); msg('&ldquo;'+w.toUpperCase()+'&rdquo; isn\u2019t in the list.'); }
     }
-    chain=[];updateHUD();setTimeout(hideChip,650);
+    chain=[];updateHUD();updateWordUI();setTimeout(hideChip,650);
+  }
+  // click-to-spell: tap tiles one at a time (great for diagonals, where dragging
+  // is fiddly). Tap a selected tile to unpick it and everything after it.
+  function tapCell(cell){
+    const idx=chain.findIndex(p=>p.r===cell.r&&p.c===cell.c);
+    if(idx>=0) chain.length=idx;                                 // deselect from here onward
+    else if(chain.length===0) chain=[cell];
+    else if(adjacent(chain[chain.length-1],cell)) chain.push(cell);
+    else chain=[cell];                                           // not adjacent → start fresh here
+    sfx('peg'); liveChip();
   }
   function collapse(){for(let c=0;c<COLS;c++){const st=[];for(let r=ROWS-1;r>=0;r--)if(grid[r][c])st.push(grid[r][c]);
     for(let r=ROWS-1;r>=0;r--)grid[r][c]=st[ROWS-1-r]||null;}}
+
+  // ---- blockers (black spaces) ----
+  const isBlocker=cl=>cl&&cl.blocker;
+  function clearAdjacentBlockers(){     // remove blockers touching any just-cleared chain cell
+    const seen={};
+    for(const p of chain) for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+      const r=p.r+dr,c=p.c+dc,k=r+','+c;
+      if(r<0||r>=ROWS||c<0||c>=COLS||seen[k])continue; seen[k]=1;
+      if(isBlocker(grid[r][c])){ grid[r][c]=null; ping(cellX(c),cellY(r),'#9fb0c0',10); sfx('bad'); }
+    }
+  }
+  function dropBlocker(){                // penalty: drop a black block into a random open column
+    const open=[]; for(let c=0;c<COLS;c++) if(lowestEmpty(c)>=0) open.push(c);
+    if(!open.length) return false;
+    const c=open[(Math.random()*open.length)|0], r=lowestEmpty(c);
+    grid[r][c]={blocker:true,pop:1}; ping(cellX(c),cellY(r),'#2a2f38',10); sfx('lock'); return true;
+  }
+
+  // ---- power-ups (coins spent per use; in-game currency only) ----
+  const playerCoins=()=>window.LL_Store?window.LL_Store.coins():coins;
+  function spend(n){ if(window.LL_Store){ if(window.LL_Store.coins()<n) return false; window.LL_Store.addCoins(-n); return true; } if(coins<n) return false; coins-=n; LS.set('coins',coins); return true; }
+  const tileCount=()=>{let n=0;for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const t=grid[r][c];if(t&&t.l)n++;}return n;};
+  function useItem(kind){
+    if(paused||gameOver) return;
+    const it=ITEMS[kind]; if(!it) return;
+    chain=[]; swapFirst=null; hideChip(); updateWordUI();   // drop any in-progress word so a collapse/swap can't strand it
+    if(playerCoins()<it.cost){ msg('Need '+it.cost+' 🪙 for '+kind+'.'); flashItem(kind); return; }
+    if(kind==='shuffle'){ if(tileCount()<2){ msg('Nothing to shuffle.'); flashItem(kind); return; } if(!spend(it.cost)) return; shuffleBoard(); sfx('streakUp',2); msg('Shuffled!'); }
+    else if(kind==='swap'){ tool='swap'; msg('Swap: tap two tiles.'); }    // charged on completion
+    else if(kind==='bomb'){ tool='bomb'; msg('Bomb: tap a tile to remove it.'); }           // charged on use
+    updateItemBar();
+  }
+  function cancelTool(){ tool=null; swapFirst=null; updateItemBar(); }
+  function applyTool(cell){
+    const cl=grid[cell.r][cell.c]; if(!cl){ cancelTool(); return; }
+    if(tool==='bomb'){
+      if(playerCoins()<ITEMS.bomb.cost){ msg('Need '+ITEMS.bomb.cost+' 🪙.'); cancelTool(); return; }
+      spend(ITEMS.bomb.cost); ping(cellX(cell.c),cellY(cell.r),'#ff7a3c',14); grid[cell.r][cell.c]=null; collapse(); sfx('bouncer'); cancelTool();
+    } else if(tool==='swap'){
+      if(isBlocker(cl)){ msg('Pick letter tiles to swap.'); return; }
+      if(!swapFirst){ swapFirst=cell; sfx('peg'); return; }
+      if(swapFirst.r===cell.r&&swapFirst.c===cell.c){ swapFirst=null; return; }   // tap again to deselect
+      if(playerCoins()<ITEMS.swap.cost){ msg('Need '+ITEMS.swap.cost+' 🪙.'); cancelTool(); return; }
+      spend(ITEMS.swap.cost);
+      const a=grid[swapFirst.r][swapFirst.c], b=grid[cell.r][cell.c]; const t=a.l; a.l=b.l; b.l=t; a.pop=1; b.pop=1;
+      ping(cellX(cell.c),cellY(cell.r),'#7af2c4',10); ping(cellX(swapFirst.c),cellY(swapFirst.r),'#7af2c4',10); sfx('lock'); cancelTool();
+    }
+  }
+  function shuffleBoard(){              // re-randomise the letters on existing tiles (positions unchanged)
+    const ls=[]; for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const t=grid[r][c]; if(t&&t.l)ls.push(t.l);}
+    for(let i=ls.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;const tmp=ls[i];ls[i]=ls[j];ls[j]=tmp;}
+    let k=0; for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const t=grid[r][c]; if(t&&t.l){t.l=ls[k++];t.pop=1;}}
+  }
+
+  // ---- Word Hunt: derive a real, formable target word from the board's letters ----
+  function boardCounts(){ const m={}; for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const t=grid[r][c]; if(t&&t.l){const k=t.l.toLowerCase(); m[k]=(m[k]||0)+1;}} return m; }
+  function fitsCounts(w,m){ const need={}; for(const ch of w){ need[ch]=(need[ch]||0)+1; if(need[ch]>(m[ch]||0)) return false; } return true; }
+  // DFS: can WORD be traced as an adjacency chain on the current board? Guarantees the
+  // target we hand the player is actually spellable (not just present as loose letters).
+  function canTrace(W){
+    W=W.toUpperCase(); const used={};
+    const dfs=(r,c,i)=>{ if(i===W.length-1) return true; used[r+','+c]=1;
+      for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){ if(!dr&&!dc)continue; const nr=r+dr,nc=c+dc;
+        if(nr<0||nr>=ROWS||nc<0||nc>=COLS||used[nr+','+nc])continue;
+        const t=grid[nr][nc]; if(t&&t.l&&t.l.toUpperCase()===W[i+1]&&dfs(nr,nc,i+1)){ used[r+','+c]=0; return true; } }
+      used[r+','+c]=0; return false; };
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const t=grid[r][c]; if(t&&t.l&&t.l.toUpperCase()===W[0]&&dfs(r,c,0)) return true;}
+    return false;
+  }
+  function findHuntTarget(){
+    const pool=window.LL_WORDPOOL; if(!pool) return null;
+    const m=boardCounts();
+    for(const len of [7,6,5,4,3]){ const arr=pool[len]||[]; const cand=[];
+      for(const w of arr){ if(huntDone.has(w))continue; if(fitsCounts(w,m)&&canTrace(w)) cand.push(w); }   // present AND traceable now
+      if(cand.length) return cand[(Math.random()*cand.length)|0].toUpperCase(); }
+    return null;
+  }
+  function maybePickHuntTarget(){
+    if(mode!=='hunt'||huntTarget) return;
+    if(huntStock<HUNT_STOCK) return;
+    huntTarget=findHuntTarget(); huntHelps=0;
+    if(huntTarget) msg('Spell it: '+huntTarget); renderLevelBar();
+  }
+  function huntHelp(){
+    if(mode!=='hunt'||!huntTarget) return;
+    if(ball||drop||paused||gameOver) return;   // only hand over a letter when the launcher is idle
+    const give=huntTarget[huntHelps % huntTarget.length];   // hand over a letter of the word
+    queue.unshift(current); queue.pop(); current=give; updateHUD();   // pop keeps the launch queue a fixed length
+    huntHelps++;
+    if(huntHelps>1 && dropBlocker()) msg('Help: ‘'+give+'’ — but a block dropped!'); else msg('Help: place the ‘'+give+'’.');
+    renderLevelBar();
+  }
+  function huntSubmit(w,lw){
+    if(!DICT.has(lw)){ chip(w,'bad'); shake=10; sfx('bad'); msg('Not a word.'); return; }
+    const g=scoreAndClear(w);
+    if(huntTarget && lw===huntTarget.toLowerCase()){
+      huntDone.add(lw); const bonus=w.length*5; score+=bonus;
+      msg('★ '+w.toUpperCase()+'!  +'+(g+bonus)); huntTarget=null; huntHelps=0;
+      setTimeout(maybePickHuntTarget,350);
+    } else msg(w.toUpperCase()+' &rarr; +'+g);
+    renderLevelBar();
+  }
 
   // ---- fx ----
   function ping(x,y,col='#fff',n=5){for(let i=0;i<n;i++){const a=Math.random()*6.28,s=1+Math.random()*3;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:1,col});}}
@@ -1033,14 +1201,38 @@ window.LL_LEVELS=[
   const toastEl=document.getElementById('toast'); let toastT=null;
   function msg(t){toastEl.innerHTML=t;toastEl.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('show'),1800);}
   const chipEl=document.getElementById('chip');
+  const wClearBtn=document.getElementById('wClear'), wSubmitBtn=document.getElementById('wSubmit');
+  function updateWordUI(){           // show/hide the ✕ clear + ✓ submit buttons for tap-to-spell
+    const n=chain.length, ready=chainWord().length>=MIN_WORD;
+    if(wClearBtn) wClearBtn.style.display=n?'grid':'none';
+    if(wSubmitBtn){ wSubmitBtn.style.display=ready?'grid':'none'; wSubmitBtn.classList.toggle('ready',ready); }
+  }
   function chip(t,cls){chipEl.textContent=t.toUpperCase();chipEl.className='chip '+cls;chipEl.style.display='inline-block';}
-  function liveChip(){const w=chainWord();if(w.length){const ok=w.length>=MIN_WORD&&DICT.has(w.toLowerCase());chipEl.textContent=w.toUpperCase();chipEl.className='chip'+(ok?' good':'');chipEl.style.display='inline-block';}else hideChip();}
-  const hideChip=()=>chipEl.style.display='none';
+  function liveChip(){const w=chainWord();if(w.length){const ok=w.length>=MIN_WORD&&DICT.has(w.toLowerCase());chipEl.textContent=w.toUpperCase();chipEl.className='chip'+(ok?' good':'');chipEl.style.display='inline-block';}else chipEl.style.display='none';updateWordUI();}
+  const hideChip=()=>{ if(chain.length) return; chipEl.style.display='none'; updateWordUI(); };  // guard the stale post-submit timer
+  if(wClearBtn) wClearBtn.onclick=()=>{ chain=[]; hideChip(); };
+  if(wSubmitBtn) wSubmitBtn.onclick=()=>{ if(chain.length){ tracing=false; submitWord(); } };
 
   // ---- levels: checklist bar + completion ----
   function renderLevelBar(){
     const bar=document.getElementById('levelbar'); if(!bar)return;
     const was=bar.classList.contains('show');
+    if(mode==='hunt'){
+      const mid=huntTarget
+        ? '<span class="lchip" style="letter-spacing:2px">'+huntTarget+'</span><button class="lretry" id="huntHelp" title="Need a letter (drops a block after the first)">＋ letter</button>'
+        : (huntStock<HUNT_STOCK
+            ? '<span class="lvl" style="opacity:.8">launch '+(HUNT_STOCK-huntStock)+' more…</span>'
+            : '<span class="lvl" style="opacity:.8">keep launching — no word yet…</span>');
+      bar.innerHTML='<button class="lmenu" id="lvlMenu" title="Game modes">&#9776;</button>'+
+        '<span class="lvl">Hunt</span>'+(huntTarget?'<span class="lvl" style="opacity:.7;font-size:11px">spell</span>':'')+mid+
+        '<button class="lretry" id="lvlRetry" title="New hunt">&#8635;</button>';
+      bar.classList.add('show');
+      const hh=document.getElementById('huntHelp'); if(hh) hh.onclick=huntHelp;
+      const rb=document.getElementById('lvlRetry'); if(rb) rb.onclick=()=>reset();
+      const mb=document.getElementById('lvlMenu'); if(mb) mb.onclick=openMenu;
+      if(!was) fit();
+      return;
+    }
     if(mode!=='level'&&mode!=='climb'){ if(was){ bar.classList.remove('show'); bar.innerHTML=''; fit(); } return; }
     const left=Math.max(0,deal.length-launched);
     const allDone=targets.length>0 && targets.every(x=>x.done);
@@ -1151,21 +1343,39 @@ window.LL_LEVELS=[
     if(window.LL_Audio)window.LL_Audio.resume();   // unlock audio on first gesture
     if(gameOver||paused)return;e.preventDefault();const p=pos(e);
     const cell=cellAt(p);
-    if(cell){tracing=true;chain=[cell];liveChip();return;}
-    if(!ball&&!drop&&current){aiming=true;aim={sx:p.x,sy:p.y,cx:p.x,cy:p.y};}
+    if(tool){ if(cell) applyTool(cell); else cancelTool(); return; }   // power-up targeting
+    // pressing a tile starts a gesture; we wait until release/move to know if it's
+    // a tap (click-to-spell) or a drag (trace), so a tap can extend the current word.
+    if(cell){ if(grid[cell.r][cell.c].l){tracing=true;dragMoved=false;gestureStart=cell;} return; }  // tile→spell, blocker→ignore
+    if(!ball&&!drop&&current){aiming=true;aim={sx:p.x,sy:p.y,cx:p.x,cy:p.y,path:[]};}
   }
   function move(e){
     if(gameOver||paused)return;const p=pos(e);
-    if(aiming){e.preventDefault();aim.cx=p.x;aim.cy=p.y;}
-    else if(tracing){e.preventDefault();const cell=cellAt(p);if(cell){
+    if(aiming){e.preventDefault();aim.cx=p.x;aim.cy=p.y;(aim.path||(aim.path=[])).push({x:p.x,y:p.y});if(aim.path.length>5)aim.path.shift();}
+    else if(tracing){e.preventDefault();const cell=cellAt(p);if(!cell||!grid[cell.r][cell.c].l)return;
+      if(!dragMoved){                                   // crossed into a letter tile → this gesture is a drag
+        if(cell.r===gestureStart.r&&cell.c===gestureStart.c)return;
+        dragMoved=true;
+        if(chain.length===0) chain=[gestureStart];      // fresh trace
+        else{ const i=chain.findIndex(q=>q.r===gestureStart.r&&q.c===gestureStart.c);
+          if(i>=0) chain.length=i+1;                    // continue from the pressed (already-picked) tile
+          else if(adjacent(chain[chain.length-1],gestureStart)) chain.push(gestureStart);  // extend, don't wipe taps
+          else chain=[gestureStart]; }
+        liveChip();
+      }
       if(chain.length>=2){const prev=chain[chain.length-2];if(cell.r===prev.r&&cell.c===prev.c){chain.pop();liveChip();return;}}
       const last=chain[chain.length-1];if(!inChain(cell.r,cell.c)&&adjacent(last,cell)){chain.push(cell);liveChip();}
-    }}
+    }
   }
   function up(){
     if(gameOver||paused)return;
-    if(aiming){aiming=false;const v=dragVec();if(v.d>14)launch(v.x*POWER,v.y*POWER);}
-    else if(tracing){tracing=false;submitWord();}
+    if(aiming){aiming=false;const v=dragVec();   // dragVec uses aimPoint() — same point the preview drew
+      if(v.d>14){launch(v.x*POWER,v.y*POWER);chain=[];hideChip();}
+    }
+    else if(tracing){tracing=false;
+      if(dragMoved) submitWord();        // a drag-trace submits on release (unchanged feel)
+      else tapCell(gestureStart);        // a stationary press = a tap → toggle that tile into the word
+    }
   }
   cv.addEventListener('mousedown',down);cv.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
   cv.addEventListener('touchstart',down,{passive:false});cv.addEventListener('touchmove',move,{passive:false});window.addEventListener('touchend',up);
@@ -1179,11 +1389,11 @@ window.LL_LEVELS=[
   // ---- game-mode menu (home screen + always-available switcher) ----
   const modeBtn=document.getElementById('modeBtn');
   const menuEl=document.getElementById('menu');
-  const MODE_NAME={level:'Levels',climb:'Climb',daily:'Daily',free:'Free'};
+  const MODE_NAME={level:'Levels',climb:'Climb',daily:'Daily',free:'Free',hunt:'Hunt'};
   function syncMode(){ if(!modeBtn)return;
     let s=''; if(mode==='daily'||mode==='climb'){ const c=currentStreak(); if(c>=1)s='  🔥'+c; }
     modeBtn.innerHTML='&#9776; '+(MODE_NAME[mode]||'Play')+s; }
-  function modeAvailable(m){ if(m==='level')return !!LEVELS().length; if(m==='climb')return !!window.LL_WORDPOOL; return true; }
+  function modeAvailable(m){ if(m==='level')return !!LEVELS().length; if(m==='climb'||m==='hunt')return !!window.LL_WORDPOOL; return true; }
   function openMenu(){
     paused=true; aiming=false; tracing=false;
     // the menu lives inside #stage, so it can't cover the result overlays or the
@@ -1196,6 +1406,7 @@ window.LL_LEVELS=[
     const mc=document.getElementById('mcClimb'); if(mc) mc.textContent=fire;
     const md=document.getElementById('mcDaily'); if(md) md.textContent=fire;
     if(menuEl) menuEl.classList.add('show');
+    updateItemBar();
   }
   function closeMenu(){ if(menuEl) menuEl.classList.remove('show'); paused=false; }
   function startMode(m){
@@ -1216,9 +1427,27 @@ window.LL_LEVELS=[
   function syncMute(){ if(!muteBtn)return; const m=window.LL_Audio?window.LL_Audio.isMuted():false; muteBtn.textContent=m?'🔇':'🔊'; }
   if(muteBtn){ muteBtn.onclick=()=>{ if(window.LL_Audio)window.LL_Audio.toggle(); syncMute(); }; syncMute(); }
 
+  // ---- power-up item bar (Shuffle / Swap / Bomb; coins spent per use) ----
+  // Declared before the store's setOnChange (which fires syncCoins→updateItemBar immediately).
+  const itemBar=document.getElementById('itembar');
+  const itemBtns={shuffle:document.getElementById('itShuffle'),swap:document.getElementById('itSwap'),bomb:document.getElementById('itBomb')};
+  function flashItem(kind){ const b=itemBtns[kind]; if(b){ b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); } }
+  function updateItemBar(){
+    if(!itemBar) return;
+    const playing = !paused && !gameOver;
+    itemBar.classList.toggle('show', playing);
+    if(!playing) return;
+    const c=playerCoins();
+    for(const k in itemBtns){ const b=itemBtns[k]; if(!b)continue;
+      b.classList.toggle('afford', c>=ITEMS[k].cost);
+      b.classList.toggle('armed', (k==='swap'&&tool==='swap')||(k==='bomb'&&tool==='bomb'));
+    }
+  }
+  for(const k in itemBtns){ const b=itemBtns[k]; if(b) b.onclick=()=>{ if(tool===k){ cancelTool(); } else useItem(k); }; }
+
   // ---- store (cosmetics; window.LL_Store) ----
   const storeBtn=document.getElementById('storeBtn');
-  function syncCoins(c){ if(storeBtn) storeBtn.textContent='🪙 '+(c!=null?c:(window.LL_Store?window.LL_Store.coins():coins)); }
+  function syncCoins(c){ if(storeBtn) storeBtn.textContent='🪙 '+(c!=null?c:(window.LL_Store?window.LL_Store.coins():coins)); updateItemBar(); }
   if(storeBtn) storeBtn.onclick=()=>{ if(window.LL_Store) window.LL_Store.open(); };
   if(window.LL_Store) window.LL_Store.setOnChange(syncCoins);
   syncCoins();
@@ -1274,6 +1503,15 @@ window.LL_LEVELS=[
     ctx.font='700 '+(s*0.18)+'px Bricolage Grotesque,sans-serif';ctx.fillStyle=bonus?'#c8860f':hexA(T.ink,0.55);ctx.textAlign='right';ctx.fillText(bonus?(val*PAD_MULT):val,s/2-7,s/2-8);
     ctx.restore();
   }
+  function drawBlocker(cx,cy,size,pop){
+    const s=size*(pop?1+0.18*pop:1);ctx.save();ctx.translate(cx,cy);
+    ctx.shadowColor='rgba(0,0,0,.5)';ctx.shadowBlur=8;ctx.shadowOffsetY=3;
+    const g=ctx.createLinearGradient(0,-s/2,0,s/2);g.addColorStop(0,'#2c313a');g.addColorStop(1,'#11141a');
+    ctx.fillStyle=g;roundRect(-s/2,-s/2,s,s,10);ctx.fill();ctx.shadowColor='transparent';
+    ctx.strokeStyle='rgba(255,255,255,.08)';ctx.lineWidth=2;roundRect(-s/2+3,-s/2+3,s-6,s-6,8);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.22)';ctx.font='900 '+(s*0.4)+'px Bricolage Grotesque,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('✕',0,1);
+    ctx.restore();
+  }
   function drawBumper(b){
     ctx.save();ctx.translate(b.x,b.y);
     const lift=(b.flash>0)?b.flash:0;
@@ -1319,7 +1557,11 @@ window.LL_LEVELS=[
 
     for(const b of BUMPERS) drawBumper(b);
 
-    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const t=grid[r][c];if(t){if(t.pop>0)t.pop-=0.12;drawTile(cellX(c),cellY(r),t.l,CELL-14,inChain(r,c),Math.max(0,t.pop),t.bonus);}}
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const t=grid[r][c];if(t){if(t.pop>0)t.pop-=0.12;
+      if(t.blocker) drawBlocker(cellX(c),cellY(r),CELL-14,Math.max(0,t.pop));
+      else drawTile(cellX(c),cellY(r),t.l,CELL-14,inChain(r,c),Math.max(0,t.pop),t.bonus);
+      if(swapFirst&&swapFirst.r===r&&swapFirst.c===c){ctx.strokeStyle='#7af2c4';ctx.lineWidth=4;roundRect(cellX(c)-(CELL-14)/2,cellY(r)-(CELL-14)/2,CELL-14,CELL-14,10);ctx.stroke();}
+    }}
     if(chain.length>1){ctx.strokeStyle='rgba(91,196,126,.9)';ctx.lineWidth=6;ctx.lineCap='round';ctx.beginPath();chain.forEach((p,i)=>{const x=cellX(p.c),y=cellY(p.r);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}
 
     drawLauncher();

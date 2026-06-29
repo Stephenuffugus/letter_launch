@@ -60,10 +60,32 @@ ready, just say **"let's get started"** and we work top-down from Phase 1.
 - **Audited ✅** — 5-dimension adversarial review (physics/state/store/UI/regression) + headless
   boot/gameplay/regression harnesses; 6 confirmed findings fixed, standalone rebuilt.
 
+**Tap-to-spell + mechanics batch (this session):**
+- **Click-to-spell ✅** — tap tiles one at a time (great for diagonals) with a `✓`/`✕` bar,
+  *or* drag-trace as before; a slip mid-tap extends instead of wiping.
+- **Aiming bugfixes ✅** — removed the bumper that sat **dead-center under the launcher**
+  (sim still 7/7); **misfire fix**: fire from the per-axis **median of the last few drag
+  samples** (rejects lift-off jerk), shared by preview *and* launch so the glow can't lie.
+- **Power-ups ✅** (`#itembar`, coins spent per use, in-game only): 🔀 Shuffle (40), 🔁 Swap
+  (30), 💣 Bomb (50). Tools intercept taps; engaging one drops any in-progress word.
+- **Blockers ✅** — black `✕` cells occupy space, can't be spelled through, and break when a
+  cleared word is adjacent. `dropBlocker`/`clearAdjacentBlockers`/`drawBlocker`.
+- **Word Hunt mode ✅** — stock the board, then it offers a real word your letters can make
+  (`findHuntTarget` now requires the word be **traceable**, not just present); spell it.
+  `＋ letter` Help hands a letter; 2nd+ help drops a blocker penalty (gated to idle launcher).
+- **Audited ✅** — 5-dimension adversarial review (aiming/power-ups/blockers/Word-Hunt/regression);
+  **11 confirmed findings fixed** (incl. a bomb+collapse stale-chain crash); 5 headless harness
+  suites pass; standalone rebuilt.
+
 ---
 
 ## ⚠️ Top of the list when we resume
 
+- **Filler letters in Levels** *(deferred from the mechanics batch)* — add extra/“decoy”
+  letters to word-list levels that aren’t part of any target, used only for spacing/positioning
+  so you arrange the board to make targets traceable. Needs a `tools/make-levels.js` change
+  (deal = target letters + N fillers; re-verify solvability) + a tweak so traced fillers don’t
+  count. The Word Hunt + blocker tension already delivers some of this puzzle feel.
 - *(cleared)* The in-game BACK/home gap is now covered by the home menu (`☰` pill + level-bar
   `☰`, reachable in every mode). If the Lucid Winds `ext` wrapper later adds its own back
   header, de-dupe then.
