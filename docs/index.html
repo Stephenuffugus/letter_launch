@@ -11,6 +11,25 @@
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Letter Launch</title>
+<script>
+/* ===== Sky Wolf Studios embed protocol =====
+   The portal (lucidwinds.com/portal/) frames games with ?embed=1 and
+   listens for {sws:'ready'} and {sws:'close'}.
+   Rules when embedded:
+     - NEVER history.back() or navigate location — an iframe with no
+       history entry goes blank (the black-screen bug).
+     - The in-game back/X returns to the game's OWN menu screen.
+     - Only the menu's explicit exit control calls SWS_EXIT(). */
+(function(){
+  var SWS_EMBED=/[?&]embed=1(&|$)/.test(location.search);
+  window.SWS_EMBED=SWS_EMBED;
+  window.SWS_EXIT=function(){
+    if(SWS_EMBED&&parent!==window){try{parent.postMessage({sws:'close'},'*');}catch(e){} return;}
+    location.href='https://lucidwinds.com/portal/';
+  };
+  if(SWS_EMBED&&parent!==window){try{parent.postMessage({sws:'ready'},'*');}catch(e){}}
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Bricolage+Grotesque:wght@500;700;800&display=swap" rel="stylesheet">
@@ -127,6 +146,7 @@
         <div class="menubtns">
           <button class="btn ghost" id="menuStore">&#129689; Store</button>
           <button class="btn ghost" id="menuHelp">How to play</button>
+          <button class="btn ghost" id="menuExit" style="min-height:44px">&larr; All Sky Wolf games</button>
         </div>
       </div>
     </div>

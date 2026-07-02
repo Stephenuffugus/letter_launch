@@ -608,6 +608,7 @@
     [].forEach.call(menuEl.querySelectorAll('.modecard'),c=>{ c.onclick=()=>startMode(c.getAttribute('data-mode')); });
     const ms=document.getElementById('menuStore'); if(ms) ms.onclick=()=>{ if(window.LL_Store) window.LL_Store.open(); };
     const mh=document.getElementById('menuHelp'); if(mh) mh.onclick=()=>document.getElementById('help').classList.add('show');
+    const mx=document.getElementById('menuExit'); if(mx) mx.onclick=()=>{ if(window.SWS_EXIT) window.SWS_EXIT(); };
   }
 
   // ---- mute toggle ----
